@@ -427,14 +427,15 @@ def login():
     user = execute_query('SELECT * FROM users WHERE username = ? AND employee_code = ?', 
                         (name, company_code), fetch_one=True)
     
-    if user and check_password_hash(user[3], password):
+    if user and check_password_hash(user[2], password):  # user[2] is password_hash
         session['user_id'] = user[0]
-        session['user_name'] = user[1]
-        session['company_code'] = user[2]
-        session['is_admin'] = user[4]
+        session['user_name'] = user[1]  # username
+        session['employee_name'] = user[3]  # employee_name
+        session['company_code'] = user[4]  # employee_code
+        session['is_admin'] = user[5]  # is_admin
         session.permanent = remember_me
         
-        if user[4]:  # is_admin
+        if user[5]:  # is_admin
             return redirect(url_for('admin_dashboard'))
         else:
             return redirect(url_for('data_entry'))

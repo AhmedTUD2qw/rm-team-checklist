@@ -48,15 +48,6 @@ def emergency_database_reset():
             FOREIGN KEY (category_id) REFERENCES categories (id)
         )''')
         
-        # إنشاء جدول أنواع العرض
-        cursor.execute('''CREATE TABLE display_types (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            category_id INTEGER,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (category_id) REFERENCES categories (id)
-        )''')
-        
         # إنشاء جدول مواد POP
         cursor.execute('''CREATE TABLE pop_materials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,43 +57,7 @@ def emergency_database_reset():
             FOREIGN KEY (model_id) REFERENCES models (id)
         )''')
         
-        # إنشاء جدول إدخال البيانات
-        cursor.execute('''CREATE TABLE data_entries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            employee_name TEXT NOT NULL,
-            employee_code TEXT NOT NULL,
-            branch_name TEXT NOT NULL,
-            shop_code TEXT,
-            category TEXT NOT NULL,
-            model TEXT NOT NULL,
-            display_type TEXT NOT NULL,
-            selected_materials TEXT,
-            missing_materials TEXT,
-            image_urls TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )''')
-        
-        # إنشاء جدول الفروع
-        cursor.execute('''CREATE TABLE branches (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            code TEXT UNIQUE NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )''')
-        
-        # إنشاء جدول فروع المستخدمين
-        cursor.execute('''CREATE TABLE user_branches (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            branch_name TEXT NOT NULL,
-            created_date TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-            UNIQUE(user_id, branch_name)
-        )''')
-        
-        print("✅ تم إنشاء جميع الجداول")
+        print("✅ تم إنشاء الجداول الأساسية")
         
         # إضافة المستخدم الإداري
         from werkzeug.security import generate_password_hash
@@ -112,35 +67,21 @@ def emergency_database_reset():
                       ('admin', admin_password, 'System Administrator', 'ADMIN001', True))
         print("👤 تم إنشاء المستخدم الإداري")
         
-        # إضافة الفئات (بدون تكرار)
-        categories = [
-            'OLED', 'Neo QLED', 'QLED', 'UHD', 'LTV',
-            'BESPOKE COMBO', 'BESPOKE Front', 'Front', 'TL', 'SBS', 'TMF', 'BMF', 'Local TMF'
-        ]
-        
+        # إضافة الفئات الأساسية فقط
+        categories = ['OLED', 'Neo QLED', 'QLED']
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         for category in categories:
             cursor.execute('INSERT INTO categories (name, created_at) VALUES (?, ?)',
                           (category, current_time))
         
-        print(f"📊 تم إضافة {len(categories)} فئة")
+        print(f"📊 تم إضافة {len(categories)} فئة أساسية")
         
-        # إضافة الموديلات (بدون تكرار)
+        # إضافة موديلات أساسية
         models_data = {
-            'OLED': ['S95F', 'S90F', 'S85F'],
-            'Neo QLED': ['QN90F', 'QN85F', 'QN80F', 'QN70F'],
-            'QLED': ['Q8F', 'Q7F'],
-            'UHD': ['U8000', '100"/98"'],
-            'LTV': ['The Frame'],
-            'BESPOKE COMBO': ['WD25DB8995', 'WD21D6400'],
-            'BESPOKE Front': ['WW11B1944DGB'],
-            'Front': ['WW11B1534D', 'WW90CGC', 'WW4040', 'WW4020'],
-            'TL': ['WA19CG6886', 'Local TL'],
-            'SBS': ['RS70F'],
-            'TMF': ['Bespoke', 'TMF Non-Bespoke', 'TMF'],
-            'BMF': ['(Bespoke, BMF)', '(Non-Bespoke, BMF)'],
-            'Local TMF': ['Local TMF']
+            'OLED': ['S95F', 'S90F'],
+            'Neo QLED': ['QN90F', 'QN85F'],
+            'QLED': ['Q8F', 'Q7F']
         }
         
         models_count = 0
@@ -154,43 +95,11 @@ def emergency_database_reset():
                                  (model_name, category_id, current_time))
                     models_count += 1
         
-        print(f"📱 تم إضافة {models_count} موديل")
+        print(f"📱 تم إضافة {models_count} موديل أساسي")
         
-        # إضافة أنواع العرض
-        display_types_data = {
-            'OLED': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-            'Neo QLED': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-            'QLED': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-            'UHD': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-            'LTV': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-            'BESPOKE COMBO': ['POP Out', 'POP Inner', 'POP'],
-            'BESPOKE Front': ['POP Out', 'POP Inner', 'POP'],
-            'Front': ['POP Out', 'POP Inner', 'POP'],
-            'TL': ['POP Out', 'POP Inner', 'POP'],
-            'SBS': ['POP Out', 'POP Inner', 'POP'],
-            'TMF': ['POP Out', 'POP Inner', 'POP'],
-            'BMF': ['POP Out', 'POP Inner', 'POP'],
-            'Local TMF': ['POP Out', 'POP Inner', 'POP']
-        }
-        
-        display_count = 0
-        for category_name, display_list in display_types_data.items():
-            cursor.execute('SELECT id FROM categories WHERE name = ?', (category_name,))
-            category_result = cursor.fetchone()
-            if category_result:
-                category_id = category_result[0]
-                for display_name in display_list:
-                    cursor.execute('INSERT INTO display_types (name, category_id, created_at) VALUES (?, ?, ?)',
-                                 (display_name, category_id, current_time))
-                    display_count += 1
-        
-        print(f"🖥️ تم إضافة {display_count} نوع عرض")
-        
-        # إضافة مواد POP لموديل S95F فقط (كمثال)
+        # إضافة مواد POP لموديل S95F فقط
         s95f_materials = [
-            'AI topper', 'OLED Topper', 'Glare Free', 'New Topper', '165 HZ Side POP',
-            'Category POP', 'Samsung OLED Topper', '165 HZ & joy stick indicator',
-            'AI Topper Gaming', 'Side POP', 'Specs Card', 'Why OLED side POP'
+            'AI topper', 'OLED Topper', 'Glare Free', 'New Topper', 'Side POP', 'Specs Card'
         ]
         
         cursor.execute('SELECT id FROM models WHERE name = ?', ('S95F',))
@@ -201,7 +110,7 @@ def emergency_database_reset():
                 cursor.execute('INSERT INTO pop_materials (name, model_id, created_at) VALUES (?, ?, ?)',
                              (material, s95f_id, current_time))
         
-        print(f"🎨 تم إضافة {len(s95f_materials)} مادة POP لموديل S95F")
+        print(f"🎨 تم إضافة {len(s95f_materials)} مادة POP")
         
         conn.commit()
         
@@ -212,16 +121,12 @@ def emergency_database_reset():
         cursor.execute("SELECT COUNT(*) FROM models")
         models_count = cursor.fetchone()[0]
         
-        cursor.execute("SELECT COUNT(*) FROM display_types")
-        display_count = cursor.fetchone()[0]
-        
         cursor.execute("SELECT COUNT(*) FROM pop_materials")
         pop_count = cursor.fetchone()[0]
         
         print(f"\n✅ قاعدة البيانات الجديدة جاهزة:")
         print(f"   📊 الفئات: {categories_count}")
         print(f"   📱 الموديلات: {models_count}")
-        print(f"   🖥️ أنواع العرض: {display_count}")
         print(f"   🎨 مواد POP: {pop_count}")
         
         return True
@@ -233,15 +138,13 @@ def emergency_database_reset():
     finally:
         conn.close()
 
-def create_emergency_js_fix():
+def create_emergency_js():
     """إنشاء ملف JavaScript طوارئ"""
     print("🔧 إنشاء ملف JavaScript طوارئ...")
     
-    emergency_js = '''
-// Emergency JavaScript Fix for Admin Management
+    emergency_js = '''// Emergency JavaScript Fix
 console.log("🚨 Emergency JavaScript Fix Loaded");
 
-// Override the handleFormSubmit function completely
 function handleFormSubmit(e) {
     console.log("🔧 Emergency handleFormSubmit called");
     e.preventDefault();
@@ -251,8 +154,6 @@ function handleFormSubmit(e) {
     const dataType = formData.get('data-type') || document.getElementById('data-type').value;
     const itemName = formData.get('item-name') || document.getElementById('item-name').value;
     const itemCategory = formData.get('item-category') || document.getElementById('item-category').value;
-    
-    console.log("📊 Form Data:", {itemId, dataType, itemName, itemCategory});
     
     const data = {
         action: itemId ? 'edit' : 'add',
@@ -264,7 +165,6 @@ function handleFormSubmit(e) {
         data.id = itemId;
     }
     
-    // CRITICAL FIX: Use category_id and model_id
     if (dataType !== 'categories') {
         data.category_id = itemCategory;
         
@@ -283,40 +183,31 @@ function handleFormSubmit(e) {
         },
         body: JSON.stringify(data)
     })
-    .then(response => {
-        console.log("📥 Response status:", response.status);
-        return response.json();
-    })
+    .then(response => response.json())
     .then(data => {
-        console.log("📥 Response data:", data);
+        console.log("📥 Response:", data);
         if (data.success) {
             alert('✅ ' + data.message);
             closeModal();
-            location.reload(); // Force reload to see changes
+            location.reload();
         } else {
             alert('❌ Error: ' + data.message);
         }
     })
     .catch(error => {
-        console.error('❌ Fetch error:', error);
+        console.error('❌ Error:', error);
         alert('❌ Network error: ' + error.message);
     });
 }
 
-// Override form submission when document is ready
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("🔧 Emergency JS: DOM loaded, setting up form");
-    
     const form = document.getElementById('dataForm');
     if (form) {
-        // Remove existing listeners
         form.removeEventListener('submit', handleFormSubmit);
-        // Add new listener
         form.addEventListener('submit', handleFormSubmit);
         console.log("✅ Emergency form handler attached");
     }
-});
-'''
+});'''
     
     with open('static/js/emergency_admin_fix.js', 'w', encoding='utf-8') as f:
         f.write(emergency_js)
@@ -333,19 +224,11 @@ def main():
         return False
     
     # إنشاء ملف JavaScript طوارئ
-    create_emergency_js_fix()
+    create_emergency_js()
     
     print("\n🎉 تم تطبيق حل الطوارئ بنجاح!")
-    print("\n📋 الخطوات التالية:")
-    print("1. أضف ملف emergency_admin_fix.js إلى admin_management.html")
-    print("2. ادفع التغييرات إلى Git")
-    print("3. انتظر النشر على Render")
     
     return True
 
 if __name__ == "__main__":
     main()
-
-<function_calls>
-<invoke name="executePwsh">
-<parameter name="command">python EMERGENCY_RENDER_FIX.py

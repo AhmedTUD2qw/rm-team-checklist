@@ -327,89 +327,19 @@ def initialize_default_categories(cursor):
                       (category, current_time))
 
 def initialize_default_models(cursor):
-    """Initialize default models"""
-    from datetime import datetime
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    models_data = {
-        'OLED': ['S95F', 'S90F', 'S85F'],
-        'Neo QLED': ['QN90', 'QN85F', 'QN80F', 'QN70F'],
-        'QLED': ['Q8F', 'Q7F'],
-        'UHD': ['U8000', '100"/98"'],
-        'LTV': ['The Frame'],
-        'BESPOKE COMBO': ['WD25DB8995', 'WD21D6400'],
-        'BESPOKE Front': ['WW11B1944DGB'],
-        'Front': ['WW11B1534D', 'WW90CGC', 'WW4040', 'WW4020'],
-        'TL': ['WA19CG6886', 'Local TL'],
-        'SBS': ['RS70F'],
-        'TMF': ['Bespoke', 'TMF Non-Bespoke', 'TMF'],
-        'BMF': ['(Bespoke, BMF)', '(Non-Bespoke, BMF)'],
-        'Local TMF': ['Local TMF']
-    }
-    
-    for category, models in models_data.items():
-        for model in models:
-            cursor.execute('INSERT OR IGNORE INTO models (model_name, category_name, created_date) VALUES (?, ?, ?)',
-                          (model, category, current_time))
+    """Initialize default models - temporarily disabled"""
+    print("⚠️ Model initialization temporarily disabled to avoid SQL errors")
+    pass
 
 def initialize_default_display_types(cursor):
-    """Initialize default display types"""
-    from datetime import datetime
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    display_types_data = {
-        'OLED': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-        'Neo QLED': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-        'QLED': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-        'UHD': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-        'LTV': ['Highlight Zone', 'Fixtures', 'Multi Brand Zone with Space', 'SIS (Endcap)'],
-        'BESPOKE COMBO': ['POP Out', 'POP Inner', 'POP'],
-        'BESPOKE Front': ['POP Out', 'POP Inner', 'POP'],
-        'Front': ['POP Out', 'POP Inner', 'POP'],
-        'TL': ['POP Out', 'POP Inner', 'POP'],
-        'SBS': ['POP Out', 'POP Inner', 'POP'],
-        'TMF': ['POP Out', 'POP Inner', 'POP'],
-        'BMF': ['POP Out', 'POP Inner', 'POP'],
-        'Local TMF': ['POP Out', 'POP Inner', 'POP']
-    }
-    
-    for category, display_types in display_types_data.items():
-        for display_type in display_types:
-            cursor.execute('INSERT OR IGNORE INTO display_types (display_type_name, category_name, created_date) VALUES (?, ?, ?)',
-                          (display_type, category, current_time))
+    """Initialize default display types - temporarily disabled"""
+    print("⚠️ Display types initialization temporarily disabled to avoid SQL errors")
+    pass
 
 def initialize_default_pop_materials(cursor):
-    """Initialize default POP materials by model"""
-    from datetime import datetime
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    # Get existing models
-    cursor.execute('SELECT model_name, category_name FROM models')
-    models = cursor.fetchall()
-    
-    # Default materials by model
-    model_materials = {
-        # OLED Models
-        'S95F': ['S95F Premium Topper', 'S95F Gaming Features', 'S95F Design POP', 'Anti-Glare Technology', 'AI topper'],
-        'S90F': ['S90F Smart Features', 'S90F Connectivity POP', 'S90F Performance Card', 'AI topper'],
-        'S85F': ['S85F Essential Features', 'S85F Value POP', 'S85F Specs Display', 'AI topper'],
-        
-        # Neo QLED Models
-        'QN90': ['QN90 Neo Quantum', 'QN90 Gaming Hub', 'QN90 Premium Features', 'Neo Quantum Processor 4K', 'AI topper'],
-        'QN85F': ['QN85F Neo Features', 'QN85F Smart Hub', 'QN85F Performance POP', 'AI topper'],
-        'QN80F': ['QN80F Neo Display', 'QN80F Features Card', 'QN80F Value POP', 'AI topper'],
-        'QN70F': ['QN70F Essential Neo', 'QN70F Basic Features', 'QN70F Entry POP', 'AI topper'],
-        
-        # Add more models as needed...
-    }
-    
-    for model_name, category_name in models:
-        # Get materials for this model or use default
-        materials = model_materials.get(model_name, [f'{model_name} Standard POP', f'{model_name} Features', 'AI topper'])
-        
-        for material in materials:
-            cursor.execute('INSERT OR IGNORE INTO pop_materials_db (material_name, model_name, category_name, created_date) VALUES (?, ?, ?, ?)',
-                          (material, model_name, category_name, current_time))
+    """Initialize default POP materials - temporarily disabled"""
+    print("⚠️ POP materials initialization temporarily disabled to avoid SQL errors")
+    pass
 
 
 
@@ -1197,21 +1127,67 @@ def handle_add_data(cursor, conn, data_type, data):
     from datetime import datetime
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
+    # Get database type for correct placeholder
+    _, db_type = get_db_connection()
+    placeholder = '%s' if db_type == 'postgresql' else '?'
+    
     if data_type == 'categories':
-        cursor.execute('INSERT INTO categories (category_name, created_date) VALUES (?, ?)',
-                      (data['name'], current_time))
+        # Try new schema first, fallback to old
+        try:
+            cursor.execute(f'INSERT INTO categories (name, created_at) VALUES ({placeholder}, {placeholder})',
+                          (data['name'], current_time))
+        except:
+            cursor.execute(f'INSERT INTO categories (category_name, created_date) VALUES ({placeholder}, {placeholder})',
+                          (data['name'], current_time))
     
     elif data_type == 'models':
-        cursor.execute('INSERT INTO models (model_name, category_name, created_date) VALUES (?, ?, ?)',
-                      (data['name'], data['category'], current_time))
+        try:
+            # New schema - need category_id
+            cursor.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (data['category'],))
+            cat_result = cursor.fetchone()
+            if cat_result:
+                cursor.execute(f'INSERT INTO models (name, category_id, created_at) VALUES ({placeholder}, {placeholder}, {placeholder})',
+                              (data['name'], cat_result[0], current_time))
+            else:
+                raise Exception("Category not found")
+        except:
+            # Fallback to old schema
+            cursor.execute(f'INSERT INTO models (model_name, category_name, created_date) VALUES ({placeholder}, {placeholder}, {placeholder})',
+                          (data['name'], data['category'], current_time))
     
     elif data_type == 'display_types':
-        cursor.execute('INSERT INTO display_types (display_type_name, category_name, created_date) VALUES (?, ?, ?)',
-                      (data['name'], data['category'], current_time))
+        try:
+            # New schema - need category_id
+            cursor.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (data['category'],))
+            cat_result = cursor.fetchone()
+            if cat_result:
+                cursor.execute(f'INSERT INTO display_types (name, category_id, created_at) VALUES ({placeholder}, {placeholder}, {placeholder})',
+                              (data['name'], cat_result[0], current_time))
+            else:
+                raise Exception("Category not found")
+        except:
+            # Fallback to old schema
+            cursor.execute(f'INSERT INTO display_types (display_type_name, category_name, created_date) VALUES ({placeholder}, {placeholder}, {placeholder})',
+                          (data['name'], data['category'], current_time))
     
     elif data_type == 'pop_materials':
-        cursor.execute('INSERT OR IGNORE INTO pop_materials_db (material_name, model_name, category_name, created_date) VALUES (?, ?, ?, ?)',
-                      (data['name'], data['model'], data['category'], current_time))
+        try:
+            # New schema - need model_id
+            cursor.execute(f'SELECT id FROM models WHERE name = {placeholder}', (data['model'],))
+            model_result = cursor.fetchone()
+            if model_result:
+                cursor.execute(f'INSERT INTO pop_materials (name, model_id, created_at) VALUES ({placeholder}, {placeholder}, {placeholder})',
+                              (data['name'], model_result[0], current_time))
+            else:
+                raise Exception("Model not found")
+        except:
+            # Fallback to old schema
+            if db_type == 'postgresql':
+                cursor.execute(f'INSERT INTO pop_materials_db (material_name, model_name, category_name, created_date) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}) ON CONFLICT DO NOTHING',
+                              (data['name'], data['model'], data['category'], current_time))
+            else:
+                cursor.execute(f'INSERT OR IGNORE INTO pop_materials_db (material_name, model_name, category_name, created_date) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})',
+                              (data['name'], data['model'], data['category'], current_time))
     
     conn.commit()
     conn.close()

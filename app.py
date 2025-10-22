@@ -1587,6 +1587,63 @@ def manage_user_branches():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/emergency_fix_database')
+def emergency_fix_database():
+    """Emergency endpoint to fix database issues"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Unauthorized", 401
+    
+    try:
+        # Run the instant fix
+        conn, db_type = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Create user_branches table
+        if db_type == 'postgresql':
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_branches (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    branch_name VARCHAR(200) NOT NULL,
+                    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, branch_name)
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_branches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    branch_name TEXT NOT NULL,
+                    created_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, branch_name)
+                )
+            ''')
+        
+        # Add test data
+        cursor.execute("SELECT id FROM users LIMIT 1")
+        user_result = cursor.fetchone()
+        if user_result:
+            user_id = user_result[0]
+            if db_type == 'postgresql':
+                cursor.execute('''
+                    INSERT INTO user_branches (user_id, branch_name) 
+                    VALUES (%s, %s) ON CONFLICT DO NOTHING
+                ''', (user_id, 'Default Branch'))
+            else:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO user_branches (user_id, branch_name) 
+                    VALUES (?, ?)
+                ''', (user_id, 'Default Branch'))
+        
+        conn.commit()
+        conn.close()
+        
+        return "✅ Database fix completed successfully! user_branches table created and ready."
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}", 500
+
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))

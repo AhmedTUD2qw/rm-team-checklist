@@ -4,11 +4,13 @@ services:
     env: python
     region: oregon
     plan: free
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app --workers 1 --timeout 120
+    buildCommand: |
+      python -m pip install --upgrade pip
+      pip install --no-cache-dir --force-reinstall -r requirements.txt
+    startCommand: python -m gunicorn --bind 0.0.0.0:$PORT app:app --workers 1 --timeout 300
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.9.18
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY

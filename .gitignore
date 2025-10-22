@@ -85,3 +85,12 @@ tmp/
 
 # Render specific
 .render/
+# Emergency deployment fixes
+requirements-backup.txt
+setup.py
+pyproject.toml
+requirements-minimal.txt
+requirements-dev.txt
+*.egg-info/
+build/
+dist/

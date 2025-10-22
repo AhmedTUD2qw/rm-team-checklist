@@ -458,11 +458,11 @@ function handleFormSubmit(e) {
     }
     
     if (dataType !== 'categories') {
-        data.category = itemCategory;
+        data.category_id = itemCategory;
         
         if (dataType === 'pop_materials') {
             const itemModel = document.getElementById('item-model').value;
-            data.model = itemModel;
+            data.model_id = itemModel;
         }
     }
     

@@ -18,8 +18,8 @@ function handleFormSubmit(event) {
         type: currentDataType,
         id: form.dataset.itemId,
         name: formData.get('name'),
-        category: formData.get('category'),
-        model: formData.get('model')
+        category_id: formData.get('category'),
+        model_id: formData.get('model')
     };
 
     showLoadingIndicator();

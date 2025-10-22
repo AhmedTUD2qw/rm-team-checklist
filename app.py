@@ -980,14 +980,26 @@ def get_management_data(data_type):
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
         if data_type == 'categories':
-            # Simple, safe query for categories
+            # Get unique categories only
             try:
-                c.execute('SELECT id, name, created_at FROM categories ORDER BY name')
-                data = [{'id': row[0], 'name': row[1], 'created_at': str(row[2])} for row in c.fetchall()]
+                c.execute('SELECT DISTINCT id, name, created_at FROM categories ORDER BY name LIMIT 50')
+                rows = c.fetchall()
+                data = []
+                seen_names = set()
+                for row in rows:
+                    if row[1] not in seen_names:
+                        seen_names.add(row[1])
+                        data.append({'id': row[0], 'name': row[1], 'created_at': str(row[2]) if row[2] else 'N/A'})
             except:
                 try:
-                    c.execute('SELECT id, category_name, created_date FROM categories ORDER BY category_name')
-                    data = [{'id': row[0], 'name': row[1], 'created_at': str(row[2])} for row in c.fetchall()]
+                    c.execute('SELECT DISTINCT id, category_name, created_date FROM categories ORDER BY category_name LIMIT 50')
+                    rows = c.fetchall()
+                    data = []
+                    seen_names = set()
+                    for row in rows:
+                        if row[1] not in seen_names:
+                            seen_names.add(row[1])
+                            data.append({'id': row[0], 'name': row[1], 'created_at': str(row[2]) if row[2] else 'N/A'})
                 except Exception as e:
                     return jsonify({'success': False, 'message': f'Categories error: {str(e)}'}), 500
         
@@ -995,28 +1007,52 @@ def get_management_data(data_type):
             category = request.args.get('category', '')
             try:
                 if category:
-                    # Try to get models for specific category
+                    # Get models for specific category - avoid duplicates
                     try:
                         # New schema
-                        c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                        c.execute(f'SELECT id FROM categories WHERE name = {placeholder} LIMIT 1', (category,))
                         cat_result = c.fetchone()
                         if cat_result:
-                            c.execute(f'SELECT id, name, category_id, created_at FROM models WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
-                            data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                            c.execute(f'SELECT DISTINCT id, name, category_id, created_at FROM models WHERE category_id = {placeholder} ORDER BY name LIMIT 50', (cat_result[0],))
+                            rows = c.fetchall()
+                            data = []
+                            seen_names = set()
+                            for row in rows:
+                                if row[1] not in seen_names:
+                                    seen_names.add(row[1])
+                                    data.append({'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                         else:
                             data = []
                     except:
                         # Old schema fallback
-                        c.execute(f'SELECT id, model_name, category_name, created_date FROM models WHERE category_name = {placeholder} ORDER BY model_name', (category,))
-                        data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute(f'SELECT DISTINCT id, model_name, category_name, created_date FROM models WHERE category_name = {placeholder} ORDER BY model_name LIMIT 50', (category,))
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                 else:
-                    # Get all models
+                    # Get all models - avoid duplicates
                     try:
-                        c.execute('SELECT id, name, category_id, created_at FROM models ORDER BY name')
-                        data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute('SELECT DISTINCT id, name, category_id, created_at FROM models ORDER BY name LIMIT 100')
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                     except:
-                        c.execute('SELECT id, model_name, category_name, created_date FROM models ORDER BY model_name')
-                        data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute('SELECT DISTINCT id, model_name, category_name, created_date FROM models ORDER BY model_name LIMIT 100')
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
             except Exception as e:
                 return jsonify({'success': False, 'message': f'Models error: {str(e)}'}), 500
         
@@ -1026,24 +1062,48 @@ def get_management_data(data_type):
                 if category:
                     try:
                         # New schema
-                        c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                        c.execute(f'SELECT id FROM categories WHERE name = {placeholder} LIMIT 1', (category,))
                         cat_result = c.fetchone()
                         if cat_result:
-                            c.execute(f'SELECT id, name, category_id, created_at FROM display_types WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
-                            data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                            c.execute(f'SELECT DISTINCT id, name, category_id, created_at FROM display_types WHERE category_id = {placeholder} ORDER BY name LIMIT 50', (cat_result[0],))
+                            rows = c.fetchall()
+                            data = []
+                            seen_names = set()
+                            for row in rows:
+                                if row[1] not in seen_names:
+                                    seen_names.add(row[1])
+                                    data.append({'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                         else:
                             data = []
                     except:
                         # Old schema fallback
-                        c.execute(f'SELECT id, display_type_name, category_name, created_date FROM display_types WHERE category_name = {placeholder} ORDER BY display_type_name', (category,))
-                        data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute(f'SELECT DISTINCT id, display_type_name, category_name, created_date FROM display_types WHERE category_name = {placeholder} ORDER BY display_type_name LIMIT 50', (category,))
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                 else:
                     try:
-                        c.execute('SELECT id, name, category_id, created_at FROM display_types ORDER BY name')
-                        data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute('SELECT DISTINCT id, name, category_id, created_at FROM display_types ORDER BY name LIMIT 100')
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                     except:
-                        c.execute('SELECT id, display_type_name, category_name, created_date FROM display_types ORDER BY display_type_name')
-                        data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute('SELECT DISTINCT id, display_type_name, category_name, created_date FROM display_types ORDER BY display_type_name LIMIT 100')
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
             except Exception as e:
                 return jsonify({'success': False, 'message': f'Display types error: {str(e)}'}), 500
         
@@ -1054,38 +1114,74 @@ def get_management_data(data_type):
                 if model:
                     try:
                         # New schema
-                        c.execute(f'SELECT id FROM models WHERE name = {placeholder}', (model,))
+                        c.execute(f'SELECT id FROM models WHERE name = {placeholder} LIMIT 1', (model,))
                         model_result = c.fetchone()
                         if model_result:
-                            c.execute(f'SELECT id, name, model_id, created_at FROM pop_materials WHERE model_id = {placeholder} ORDER BY name', (model_result[0],))
-                            data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                            c.execute(f'SELECT DISTINCT id, name, model_id, created_at FROM pop_materials WHERE model_id = {placeholder} ORDER BY name LIMIT 50', (model_result[0],))
+                            rows = c.fetchall()
+                            data = []
+                            seen_names = set()
+                            for row in rows:
+                                if row[1] not in seen_names:
+                                    seen_names.add(row[1])
+                                    data.append({'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                         else:
                             data = []
                     except:
                         # Old schema fallback
-                        c.execute(f'SELECT id, material_name, model_name, created_date FROM pop_materials_db WHERE model_name = {placeholder} ORDER BY material_name', (model,))
-                        data = [{'id': row[0], 'name': row[1], 'model': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute(f'SELECT DISTINCT id, material_name, model_name, created_date FROM pop_materials_db WHERE model_name = {placeholder} ORDER BY material_name LIMIT 50', (model,))
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'model': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                 elif category:
                     try:
                         # New schema
-                        c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                        c.execute(f'SELECT id FROM categories WHERE name = {placeholder} LIMIT 1', (category,))
                         cat_result = c.fetchone()
                         if cat_result:
-                            c.execute(f'SELECT pm.id, pm.name, pm.model_id, pm.created_at FROM pop_materials pm JOIN models m ON pm.model_id = m.id WHERE m.category_id = {placeholder} ORDER BY pm.name', (cat_result[0],))
-                            data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                            c.execute(f'SELECT DISTINCT pm.id, pm.name, pm.model_id, pm.created_at FROM pop_materials pm JOIN models m ON pm.model_id = m.id WHERE m.category_id = {placeholder} ORDER BY pm.name LIMIT 50', (cat_result[0],))
+                            rows = c.fetchall()
+                            data = []
+                            seen_names = set()
+                            for row in rows:
+                                if row[1] not in seen_names:
+                                    seen_names.add(row[1])
+                                    data.append({'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                         else:
                             data = []
                     except:
                         # Old schema fallback
-                        c.execute(f'SELECT id, material_name, model_name, created_date FROM pop_materials_db WHERE category_name = {placeholder} ORDER BY material_name', (category,))
-                        data = [{'id': row[0], 'name': row[1], 'model': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute(f'SELECT DISTINCT id, material_name, model_name, created_date FROM pop_materials_db WHERE category_name = {placeholder} ORDER BY material_name LIMIT 50', (category,))
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'model': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                 else:
                     try:
-                        c.execute('SELECT id, name, model_id, created_at FROM pop_materials ORDER BY name')
-                        data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute('SELECT DISTINCT id, name, model_id, created_at FROM pop_materials ORDER BY name LIMIT 100')
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                     except:
-                        c.execute('SELECT id, material_name, model_name, created_date FROM pop_materials_db ORDER BY material_name')
-                        data = [{'id': row[0], 'name': row[1], 'model': row[2], 'created_at': str(row[3])} for row in c.fetchall()]
+                        c.execute('SELECT DISTINCT id, material_name, model_name, created_date FROM pop_materials_db ORDER BY material_name LIMIT 100')
+                        rows = c.fetchall()
+                        data = []
+                        seen_names = set()
+                        for row in rows:
+                            if row[1] not in seen_names:
+                                seen_names.add(row[1])
+                                data.append({'id': row[0], 'name': row[1], 'model': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
             except Exception as e:
                 return jsonify({'success': False, 'message': f'POP materials error: {str(e)}'}), 500
         

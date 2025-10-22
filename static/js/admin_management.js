@@ -236,7 +236,7 @@ function updateTable(dataType, data) {
             row.innerHTML = `
                 <td>${item.id}</td>
                 <td>${item.name}</td>
-                <td>${formatDate(item.created_date)}</td>
+                <td>${formatDate(item.created_at || item.created_date)}</td>
                 <td>
                     <button class="btn btn-sm btn-secondary" onclick="editItem('${dataType}', ${item.id}, '${item.name}')">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteItem('${dataType}', ${item.id})">Delete</button>
@@ -247,10 +247,10 @@ function updateTable(dataType, data) {
                 <td>${item.id}</td>
                 <td>${item.name}</td>
                 <td>${item.model || 'N/A'}</td>
-                <td>${item.category}</td>
-                <td>${formatDate(item.created_date)}</td>
+                <td>${item.category || 'N/A'}</td>
+                <td>${formatDate(item.created_at || item.created_date)}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary" onclick="editItem('${dataType}', ${item.id}, '${item.name}', '${item.category}', '${item.model || ''}')">Edit</button>
+                    <button class="btn btn-sm btn-secondary" onclick="editItem('${dataType}', ${item.id}, '${item.name}', '${item.category || ''}', '${item.model || ''}')">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteItem('${dataType}', ${item.id})">Delete</button>
                 </td>
             `;
@@ -258,10 +258,10 @@ function updateTable(dataType, data) {
             row.innerHTML = `
                 <td>${item.id}</td>
                 <td>${item.name}</td>
-                <td>${item.category}</td>
-                <td>${formatDate(item.created_date)}</td>
+                <td>${item.category || 'N/A'}</td>
+                <td>${formatDate(item.created_at || item.created_date)}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary" onclick="editItem('${dataType}', ${item.id}, '${item.name}', '${item.category}')">Edit</button>
+                    <button class="btn btn-sm btn-secondary" onclick="editItem('${dataType}', ${item.id}, '${item.name}', '${item.category || ''}')">Edit</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteItem('${dataType}', ${item.id})">Delete</button>
                 </td>
             `;
@@ -272,8 +272,19 @@ function updateTable(dataType, data) {
 }
 
 function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    if (!dateString || dateString === 'N/A' || dateString === 'null' || dateString === 'undefined') {
+        return 'N/A';
+    }
+    
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+            return 'N/A';
+        }
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    } catch (error) {
+        return 'N/A';
+    }
 }
 
 function showAddModal(dataType) {

@@ -37,9 +37,10 @@
                     <tr>
                         <td>{{ user[0] }}</td>
                         <td>{{ user[1] }}</td>
-                        <td>{{ user[2] }}</td>
+                        <td>{{ user[3] }}</td>
+                        <td>{{ user[4] }}</td>
                         <td>
-                            {% if user[4] %}
+                            {% if user[5] %}
                             <span class="role-badge admin">Admin</span>
                             {% else %}
                             <span class="role-badge employee">Employee</span>
@@ -67,8 +68,8 @@
                         </td>
                         <td>
                             <button class="btn btn-sm btn-secondary" data-user-id="{{ user[0] }}"
-                                data-user-name="{{ user[1] }}" data-user-code="{{ user[2] }}"
-                                data-user-admin="{{ user[4] }}" onclick="editUserFromButton(this)">
+                                data-user-name="{{ user[1] }}" data-user-code="{{ user[4] }}"
+                                data-user-admin="{{ user[5] }}" onclick="editUserFromButton(this)">
                                 Edit
                             </button>
                             {% if user[0] != session.user_id %}

@@ -460,32 +460,77 @@ def get_dynamic_data(data_type):
     try:
         conn, db_type = get_db_connection()
         c = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
         
         if data_type == 'categories':
-            c.execute('SELECT name FROM categories ORDER BY name')
-            data = [row[0] for row in c.fetchall()]
+            # Try new schema first, fallback to old
+            try:
+                c.execute('SELECT name FROM categories ORDER BY name')
+                data = [row[0] for row in c.fetchall()]
+            except:
+                c.execute('SELECT category_name FROM categories ORDER BY category_name')
+                data = [row[0] for row in c.fetchall()]
         
         elif data_type == 'models':
             category = request.args.get('category', '')
             if category:
-                c.execute('SELECT name FROM models WHERE name = ? ORDER BY model_name', (category,))
+                # Try new schema first
+                try:
+                    # Get category ID first
+                    c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                    cat_result = c.fetchone()
+                    if cat_result:
+                        c.execute(f'SELECT name FROM models WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
+                        data = [row[0] for row in c.fetchall()]
+                    else:
+                        data = []
+                except:
+                    # Fallback to old schema
+                    c.execute(f'SELECT model_name FROM models WHERE category_name = {placeholder} ORDER BY model_name', (category,))
+                    data = [row[0] for row in c.fetchall()]
             else:
-                c.execute('SELECT model_name, category_name FROM models ORDER BY name, model_name')
-            data = c.fetchall()
+                try:
+                    c.execute('SELECT name FROM models ORDER BY name')
+                    data = [row[0] for row in c.fetchall()]
+                except:
+                    c.execute('SELECT model_name FROM models ORDER BY model_name')
+                    data = [row[0] for row in c.fetchall()]
         
         elif data_type == 'display_types':
             category = request.args.get('category', '')
             if category:
-                c.execute('SELECT name FROM display_types WHERE name = ? ORDER BY display_type_name', (category,))
-                data = [row[0] for row in c.fetchall()]
+                try:
+                    # Get category ID first
+                    c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                    cat_result = c.fetchone()
+                    if cat_result:
+                        c.execute(f'SELECT name FROM display_types WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
+                        data = [row[0] for row in c.fetchall()]
+                    else:
+                        data = []
+                except:
+                    # Fallback to old schema
+                    c.execute(f'SELECT display_type_name FROM display_types WHERE category_name = {placeholder} ORDER BY display_type_name', (category,))
+                    data = [row[0] for row in c.fetchall()]
             else:
                 data = []
         
         elif data_type == 'pop_materials':
             model = request.args.get('model', '')
             if model:
-                c.execute('SELECT name FROM pop_materials_db WHERE name = ? ORDER BY material_name', (model,))
-                data = [row[0] for row in c.fetchall()]
+                try:
+                    # Get model ID first
+                    c.execute(f'SELECT id FROM models WHERE name = {placeholder}', (model,))
+                    model_result = c.fetchone()
+                    if model_result:
+                        c.execute(f'SELECT name FROM pop_materials WHERE model_id = {placeholder} ORDER BY name', (model_result[0],))
+                        data = [row[0] for row in c.fetchall()]
+                    else:
+                        data = []
+                except:
+                    # Fallback to old schema
+                    c.execute(f'SELECT material_name FROM pop_materials_db WHERE model_name = {placeholder} ORDER BY material_name', (model,))
+                    data = [row[0] for row in c.fetchall()]
             else:
                 data = []
         
@@ -493,6 +538,7 @@ def get_dynamic_data(data_type):
         return jsonify({'success': True, 'data': data})
         
     except Exception as e:
+        print(f"Error in get_dynamic_data: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/get_branches', methods=['GET'])

@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 from io import BytesIO
 from dotenv import load_dotenv
-from data_management_routes import handle_manage_data
+# Removed external data management routes - using internal implementation
 try:
     import psycopg2
     from urllib.parse import urlparse
@@ -1233,21 +1233,239 @@ def manage_data():
     
     try:
         data = request.get_json()
-        return handle_manage_data(data)
+        action = data.get('action')
+        data_type = data.get('type')
+        
+        conn, db_type = get_db_connection()
+        cursor = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        try:
+            if action == 'add':
+                return handle_add_data_internal(cursor, conn, data_type, data, placeholder)
+            elif action == 'edit':
+                return handle_edit_data_internal(cursor, conn, data_type, data, placeholder)
+            elif action == 'delete':
+                return handle_delete_data_internal(cursor, conn, data_type, data, placeholder)
+            else:
+                return jsonify({'success': False, 'message': 'Invalid action'}), 400
+                
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
             
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
-def handle_add_data(cursor, conn, data_type, data):
+def handle_add_data_internal(cursor, conn, data_type, data, placeholder):
+    """Handle adding new data"""
     from datetime import datetime
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    # Get database type for correct placeholder and time format
-    _, db_type = get_db_connection()
-    placeholder = '%s' if db_type == 'postgresql' else '?'
-    
-    if db_type == 'postgresql':
-        current_time = datetime.now()  # Use datetime object for PostgreSQL
-    else:
+    try:
+        if data_type == 'categories':
+            name = data.get('name', '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Category name is required'}), 400
+            
+            # Check if category already exists (check both old and new column names)
+            cursor.execute(f'SELECT COUNT(*) FROM categories WHERE category_name = {placeholder} OR name = {placeholder}', (name, name))
+            if cursor.fetchone()[0] > 0:
+                return jsonify({'success': False, 'message': 'Category already exists'}), 400
+            
+            # Insert using old schema columns (which are NOT NULL)
+            cursor.execute(f'INSERT INTO categories (category_name, created_date, name, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})',
+                         (name, current_time, name, current_time))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Category added successfully'})
+        
+        elif data_type == 'models':
+            name = data.get('name', '').strip()
+            category_id = data.get('category_id')
+            
+            if not name:
+                return jsonify({'success': False, 'message': 'Model name is required'}), 400
+            
+            # Get category name for old schema
+            category_name = ''
+            if category_id:
+                cursor.execute(f'SELECT category_name FROM categories WHERE id = {placeholder}', (category_id,))
+                cat_result = cursor.fetchone()
+                if cat_result:
+                    category_name = cat_result[0]
+                else:
+                    return jsonify({'success': False, 'message': 'Invalid category'}), 400
+            else:
+                return jsonify({'success': False, 'message': 'Category is required'}), 400
+            
+            # Check if model already exists
+            cursor.execute(f'SELECT COUNT(*) FROM models WHERE (model_name = {placeholder} AND category_name = {placeholder}) OR (name = {placeholder} AND category_id = {placeholder})', 
+                         (name, category_name, name, category_id))
+            if cursor.fetchone()[0] > 0:
+                return jsonify({'success': False, 'message': 'Model already exists in this category'}), 400
+            
+            # Insert using both old and new schema columns
+            cursor.execute(f'INSERT INTO models (model_name, category_name, created_date, name, category_id, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})',
+                         (name, category_name, current_time, name, category_id, current_time))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Model added successfully'})
+        
+        elif data_type == 'display_types':
+            name = data.get('name', '').strip()
+            category_id = data.get('category_id')
+            
+            if not name:
+                return jsonify({'success': False, 'message': 'Display type name is required'}), 400
+            
+            # Get category name for old schema
+            category_name = ''
+            if category_id:
+                cursor.execute(f'SELECT category_name FROM categories WHERE id = {placeholder}', (category_id,))
+                cat_result = cursor.fetchone()
+                if cat_result:
+                    category_name = cat_result[0]
+                else:
+                    return jsonify({'success': False, 'message': 'Invalid category'}), 400
+            else:
+                return jsonify({'success': False, 'message': 'Category is required'}), 400
+            
+            # Insert using both old and new schema columns
+            cursor.execute(f'INSERT INTO display_types (display_type_name, category_name, created_date, name, category_id, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})',
+                         (name, category_name, current_time, name, category_id, current_time))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Display type added successfully'})
+        
+        elif data_type == 'pop_materials':
+            name = data.get('name', '').strip()
+            model_id = data.get('model_id')
+            
+            if not name or not model_id:
+                return jsonify({'success': False, 'message': 'Material name and model are required'}), 400
+            
+            cursor.execute(f'INSERT INTO pop_materials (name, model_id, created_at) VALUES ({placeholder}, {placeholder}, {placeholder})',
+                         (name, model_id, current_time))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'POP material added successfully'})
+        
+        else:
+            return jsonify({'success': False, 'message': 'Invalid data type'}), 400
+            
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
+
+def handle_edit_data_internal(cursor, conn, data_type, data, placeholder):
+    """Handle editing existing data"""
+    try:
+        item_id = data.get('id')
+        if not item_id:
+            return jsonify({'success': False, 'message': 'Item ID is required'}), 400
+        
+        if data_type == 'categories':
+            name = data.get('name', '').strip()
+            if not name:
+                return jsonify({'success': False, 'message': 'Category name is required'}), 400
+            
+            cursor.execute(f'UPDATE categories SET name = {placeholder} WHERE id = {placeholder}',
+                         (name, item_id))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Category updated successfully'})
+        
+        elif data_type == 'models':
+            name = data.get('name', '').strip()
+            category_id = data.get('category_id')
+            
+            if not name:
+                return jsonify({'success': False, 'message': 'Model name is required'}), 400
+            
+            if category_id:
+                cursor.execute(f'UPDATE models SET name = {placeholder}, category_id = {placeholder} WHERE id = {placeholder}',
+                             (name, category_id, item_id))
+            else:
+                cursor.execute(f'UPDATE models SET name = {placeholder} WHERE id = {placeholder}',
+                             (name, item_id))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Model updated successfully'})
+        
+        elif data_type == 'display_types':
+            name = data.get('name', '').strip()
+            category_id = data.get('category_id')
+            
+            if not name:
+                return jsonify({'success': False, 'message': 'Display type name is required'}), 400
+            
+            if category_id:
+                cursor.execute(f'UPDATE display_types SET name = {placeholder}, category_id = {placeholder} WHERE id = {placeholder}',
+                             (name, category_id, item_id))
+            else:
+                cursor.execute(f'UPDATE display_types SET name = {placeholder} WHERE id = {placeholder}',
+                             (name, item_id))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Display type updated successfully'})
+        
+        elif data_type == 'pop_materials':
+            name = data.get('name', '').strip()
+            model_id = data.get('model_id')
+            
+            if not name:
+                return jsonify({'success': False, 'message': 'Material name is required'}), 400
+            
+            if model_id:
+                cursor.execute(f'UPDATE pop_materials SET name = {placeholder}, model_id = {placeholder} WHERE id = {placeholder}',
+                             (name, model_id, item_id))
+            else:
+                cursor.execute(f'UPDATE pop_materials SET name = {placeholder} WHERE id = {placeholder}',
+                             (name, item_id))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'POP material updated successfully'})
+        
+        else:
+            return jsonify({'success': False, 'message': 'Invalid data type'}), 400
+            
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
+
+def handle_delete_data_internal(cursor, conn, data_type, data, placeholder):
+    """Handle deleting data"""
+    try:
+        item_id = data.get('id')
+        if not item_id:
+            return jsonify({'success': False, 'message': 'Item ID is required'}), 400
+        
+        if data_type == 'categories':
+            # Check if category has models
+            cursor.execute(f'SELECT COUNT(*) FROM models WHERE category_id = {placeholder}', (item_id,))
+            if cursor.fetchone()[0] > 0:
+                return jsonify({'success': False, 'message': 'Cannot delete category with existing models'}), 400
+            
+            cursor.execute(f'DELETE FROM categories WHERE id = {placeholder}', (item_id,))
+            
+        elif data_type == 'models':
+            # Check if model has POP materials
+            cursor.execute(f'SELECT COUNT(*) FROM pop_materials WHERE model_id = {placeholder}', (item_id,))
+            if cursor.fetchone()[0] > 0:
+                return jsonify({'success': False, 'message': 'Cannot delete model with existing POP materials'}), 400
+            
+            cursor.execute(f'DELETE FROM models WHERE id = {placeholder}', (item_id,))
+            
+        elif data_type == 'display_types':
+            cursor.execute(f'DELETE FROM display_types WHERE id = {placeholder}', (item_id,))
+            
+        elif data_type == 'pop_materials':
+            cursor.execute(f'DELETE FROM pop_materials WHERE id = {placeholder}', (item_id,))
+            
+        else:
+            return jsonify({'success': False, 'message': 'Invalid data type'}), 400
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': f'{data_type.title()} deleted successfully'})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Use string for SQLite
     
     if data_type == 'categories':

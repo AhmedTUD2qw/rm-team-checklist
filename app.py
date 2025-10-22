@@ -1400,155 +1400,24 @@ def manage_user():
     if 'user_id' not in session or not session.get('is_admin'):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
     
-    try:
-        data = request.get_json()
-        action = data.get('action')
-        
-        conn, db_type = get_db_connection()
-        c = conn.cursor()
-        
-        if action == 'add':
-            name = data.get('name')
-            company_code = data.get('company_code')
-            password = data.get('password')
-            is_admin = data.get('is_admin', False)
-            
-            # Check if user already exists
-            c.execute('SELECT * FROM users WHERE name = ? OR company_code = ?', (name, company_code))
-            if c.fetchone():
-                return jsonify({'success': False, 'message': 'User with this name or company code already exists'})
-            
-            hashed_password = generate_password_hash(password)
-            c.execute('INSERT INTO users (name, company_code, password, is_admin) VALUES (?, ?, ?, ?)',
-                     (name, company_code, hashed_password, is_admin))
-            
-        elif action == 'edit':
-            user_id = data.get('id')
-            name = data.get('name')
-            company_code = data.get('company_code')
-            password = data.get('password')
-            is_admin = data.get('is_admin', False)
-            
-            # Check if another user has the same name or company code
-            c.execute('SELECT * FROM users WHERE (name = ? OR company_code = ?) AND id != ?', 
-                     (name, company_code, user_id))
-            if c.fetchone():
-                return jsonify({'success': False, 'message': 'Another user with this name or company code already exists'})
-            
-            if password:
-                # Update with new password
-                hashed_password = generate_password_hash(password)
-                c.execute('UPDATE users SET name = ?, company_code = ?, password = ?, is_admin = ? WHERE id = ?',
-                         (name, company_code, hashed_password, is_admin, user_id))
-            else:
-                # Update without changing password
-                c.execute('UPDATE users SET name = ?, company_code = ?, is_admin = ? WHERE id = ?',
-                         (name, company_code, is_admin, user_id))
-            
-        elif action == 'delete':
-            user_id = data.get('id')
-            
-            # Prevent deleting the current admin user
-            if user_id == session['user_id']:
-                return jsonify({'success': False, 'message': 'Cannot delete your own account'})
-            
-            # Check if this is the last admin
-            c.execute('SELECT COUNT(*) FROM users WHERE is_admin = TRUE')
-            admin_count = c.fetchone()[0]
-            
-            c.execute('SELECT is_admin FROM users WHERE id = ?', (user_id,))
-            user_to_delete = c.fetchone()
-            
-            if user_to_delete and user_to_delete[0] and admin_count <= 1:
-                return jsonify({'success': False, 'message': 'Cannot delete the last admin user'})
-            
-            # Delete user's branches and data entries
-            c.execute('SELECT company_code FROM users WHERE id = ?', (user_id,))
-            user_data = c.fetchone()
-            if user_data:
-                company_code = user_data[0]
-                c.execute('DELETE FROM branches WHERE employee_code = ?', (company_code,))
-                
-                # Get and delete images from data entries
-                c.execute('SELECT images FROM data_entries WHERE employee_code = ?', (company_code,))
-                entries = c.fetchall()
-                for entry in entries:
-                    if entry[0]:
-                        images = entry[0].split(',')
-                        for image in images:
-                            image_path = os.path.join(app.config['UPLOAD_FOLDER'], image)
-                            if os.path.exists(image_path):
-                                os.remove(image_path)
-                
-                c.execute('DELETE FROM data_entries WHERE employee_code = ?', (company_code,))
-            
-            c.execute('DELETE FROM users WHERE id = ?', (user_id,))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({'success': True, 'message': f'User {action}ed successfully'})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    # Temporarily disabled for debugging
+    return jsonify({'success': False, 'message': 'User management temporarily disabled for maintenance'}), 503
 
 @app.route('/change_admin_password', methods=['POST'])
 def change_admin_password():
     if 'user_id' not in session or not session.get('is_admin'):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
     
-    try:
-        data = request.get_json()
-        current_password = data.get('current_password')
-        new_password = data.get('new_password')
-        
-        conn, db_type = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT password FROM users WHERE id = ?', (session['user_id'],))
-        user = c.fetchone()
-        
-        if not user or not check_password_hash(user[0], current_password):
-            return jsonify({'success': False, 'message': 'Current password is incorrect'})
-        
-        hashed_password = generate_password_hash(new_password)
-        c.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_password, session['user_id']))
-        conn.commit()
-        conn.close()
-        
-        return jsonify({'success': True, 'message': 'Password changed successfully'})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    # Temporarily disabled for debugging
+    return jsonify({'success': False, 'message': 'Password change temporarily disabled for maintenance'}), 503
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if 'user_id' not in session or not session.get('is_admin'):
         return redirect(url_for('index'))
     
-    if request.method == 'POST':
-        name = request.form['name']
-        company_code = request.form['company_code']
-        password = request.form['password']
-        
-        # Check if user already exists
-        conn, db_type = get_db_connection()
-        c = conn.cursor()
-        c.execute('SELECT * FROM users WHERE name = ? OR company_code = ?', (name, company_code))
-        existing_user = c.fetchone()
-        
-        if existing_user:
-            flash('User with this name or company code already exists')
-        else:
-            hashed_password = generate_password_hash(password)
-            c.execute('INSERT INTO users (name, company_code, password, is_admin) VALUES (?, ?, ?, ?)',
-                     (name, company_code, hashed_password, False))
-            conn.commit()
-            flash('User registered successfully')
-        
-        conn.close()
-        return redirect(url_for('user_management'))
-    
-    return render_template('register.html')
+    # Temporarily disabled for debugging
+    return "Registration temporarily disabled for maintenance. <a href='/admin_dashboard'>Back to Dashboard</a>"
 
 @app.route('/get_user_branches/<int:user_id>')
 def get_user_branches(user_id):

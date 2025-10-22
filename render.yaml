@@ -2,15 +2,9 @@ services:
   - type: web
     name: rm-team-checklist
     env: python
-    region: oregon
-    plan: free
-    buildCommand: |
-      python -m pip install --upgrade pip
-      pip install --no-cache-dir --force-reinstall -r requirements.txt
-    startCommand: python -m gunicorn --bind 0.0.0.0:$PORT app:app --workers 1 --timeout 300
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.9.18
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
@@ -23,7 +17,5 @@ services:
   - type: pserv
     name: rm-checklist-db
     env: postgresql
-    plan: free
-    region: oregon
     databaseName: rm_checklist
     databaseUser: rm_user

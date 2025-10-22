@@ -462,21 +462,21 @@ def get_dynamic_data(data_type):
         c = conn.cursor()
         
         if data_type == 'categories':
-            c.execute('SELECT category_name FROM categories ORDER BY category_name')
+            c.execute('SELECT name FROM categories ORDER BY name')
             data = [row[0] for row in c.fetchall()]
         
         elif data_type == 'models':
             category = request.args.get('category', '')
             if category:
-                c.execute('SELECT model_name FROM models WHERE category_name = ? ORDER BY model_name', (category,))
+                c.execute('SELECT name FROM models WHERE name = ? ORDER BY model_name', (category,))
             else:
-                c.execute('SELECT model_name, category_name FROM models ORDER BY category_name, model_name')
+                c.execute('SELECT model_name, category_name FROM models ORDER BY name, model_name')
             data = c.fetchall()
         
         elif data_type == 'display_types':
             category = request.args.get('category', '')
             if category:
-                c.execute('SELECT display_type_name FROM display_types WHERE category_name = ? ORDER BY display_type_name', (category,))
+                c.execute('SELECT name FROM display_types WHERE name = ? ORDER BY display_type_name', (category,))
                 data = [row[0] for row in c.fetchall()]
             else:
                 data = []
@@ -484,7 +484,7 @@ def get_dynamic_data(data_type):
         elif data_type == 'pop_materials':
             model = request.args.get('model', '')
             if model:
-                c.execute('SELECT material_name FROM pop_materials_db WHERE model_name = ? ORDER BY material_name', (model,))
+                c.execute('SELECT name FROM pop_materials_db WHERE name = ? ORDER BY material_name', (model,))
                 data = [row[0] for row in c.fetchall()]
             else:
                 data = []
@@ -512,12 +512,12 @@ def get_branches():
             c.execute('''SELECT branch_name, shop_code FROM branches 
                         WHERE employee_code = ? AND 
                         (branch_name LIKE ? OR shop_code LIKE ?) 
-                        ORDER BY branch_name_name''', 
+                        ORDER BY branch_name''', 
                      (employee_code, f'%{search_term}%', f'%{search_term}%'))
         else:
             c.execute('''SELECT branch_name, shop_code FROM branches 
                         WHERE employee_code = ? 
-                        ORDER BY branch_name_name''', 
+                        ORDER BY branch_name''', 
                      (employee_code,))
         
         branches = [{'name': row[0], 'code': row[1]} for row in c.fetchall()]
@@ -666,7 +666,7 @@ def submit_data():
             # Get all materials for the selected model from database
             conn_materials = sqlite3.connect('database.db')
             c_materials = conn_materials.cursor()
-            c_materials.execute('SELECT material_name FROM pop_materials_db WHERE model_name = ?', (model,))
+            c_materials.execute('SELECT name FROM pop_materials_db WHERE name = ?', (model,))
             model_materials = [row[0] for row in c_materials.fetchall()]
             conn_materials.close()
             
@@ -699,8 +699,8 @@ def submit_data():
             conn, db_type = get_db_connection()
             c = conn.cursor()
             c.execute('''INSERT INTO data_entries 
-                        (employee_name, employee_code, branch, shop_code, model, display_type, 
-                         selected_materials, unselected_materials, images, date)
+                        (employee_name, employee_code, branch_name, shop_code, model, display_type, 
+                         selected_materials, missing_materials, image_urls, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                      (employee_name, employee_code, branch, shop_code, f"{category} - {model}", 
                       display_type, ','.join(selected_materials), 
@@ -812,8 +812,8 @@ def export_excel():
         date_to = request.args.get('date_to', '')
         
         # بناء الاستعلام مع الفلاتر (نفس منطق admin_dashboard)
-        query = '''SELECT id, employee_name, employee_code, branch, shop_code, model, 
-                          display_type, selected_materials, unselected_materials, images, date 
+        query = '''SELECT id, employee_name, employee_code, branch_name, shop_code, model, 
+                          display_type, selected_materials, missing_materials, image_urls, created_at 
                    FROM data_entries WHERE 1=1'''
         params = []
         
@@ -893,8 +893,8 @@ def export_excel_simple():
         date_to = request.args.get('date_to', '')
         
         # بناء الاستعلام مع الفلاتر (نفس منطق admin_dashboard)
-        query = '''SELECT id, employee_name, employee_code, branch, shop_code, model, 
-                          display_type, selected_materials, unselected_materials, images, date 
+        query = '''SELECT id, employee_name, employee_code, branch_name, shop_code, model, 
+                          display_type, selected_materials, missing_materials, image_urls, created_at 
                    FROM data_entries WHERE 1=1'''
         params = []
         
@@ -1003,36 +1003,36 @@ def get_management_data(data_type):
         c = conn.cursor()
         
         if data_type == 'categories':
-            c.execute('SELECT * FROM categories ORDER BY category_name')
+            c.execute('SELECT * FROM categories ORDER BY name')
             data = [{'id': row[0], 'name': row[1], 'created_date': row[2]} for row in c.fetchall()]
         
         elif data_type == 'models':
             category = request.args.get('category', '')
             if category:
-                c.execute('SELECT * FROM models WHERE category_name = ? ORDER BY model_name', (category,))
+                c.execute('SELECT * FROM models WHERE name = ? ORDER BY model_name', (category,))
             else:
-                c.execute('SELECT * FROM models ORDER BY category_name, model_name')
+                c.execute('SELECT * FROM models ORDER BY name, model_name')
             data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_date': row[3]} for row in c.fetchall()]
         
         elif data_type == 'display_types':
             category = request.args.get('category', '')
             if category:
-                c.execute('SELECT * FROM display_types WHERE category_name = ? ORDER BY display_type_name', (category,))
+                c.execute('SELECT * FROM display_types WHERE name = ? ORDER BY display_type_name', (category,))
             else:
-                c.execute('SELECT * FROM display_types ORDER BY category_name, display_type_name')
+                c.execute('SELECT * FROM display_types ORDER BY name, display_type_name')
             data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_date': row[3]} for row in c.fetchall()]
         
         elif data_type == 'pop_materials':
             model = request.args.get('model', '')
             category = request.args.get('category', '')
             if model:
-                c.execute('SELECT * FROM pop_materials_db WHERE model_name = ? ORDER BY material_name', (model,))
+                c.execute('SELECT * FROM pop_materials_db WHERE name = ? ORDER BY material_name', (model,))
                 data = [{'id': row[0], 'name': row[1], 'model': row[2], 'category': row[3], 'created_date': row[4]} for row in c.fetchall()]
             elif category:
-                c.execute('SELECT * FROM pop_materials_db WHERE category_name = ? ORDER BY model_name, material_name', (category,))
+                c.execute('SELECT * FROM pop_materials_db WHERE name = ? ORDER BY model_name, material_name', (category,))
                 data = [{'id': row[0], 'name': row[1], 'model': row[2], 'category': row[3], 'created_date': row[4]} for row in c.fetchall()]
             else:
-                c.execute('SELECT * FROM pop_materials_db ORDER BY category_name, model_name, material_name')
+                c.execute('SELECT * FROM pop_materials_db ORDER BY name, model_name, material_name')
                 data = [{'id': row[0], 'name': row[1], 'model': row[2], 'category': row[3], 'created_date': row[4]} for row in c.fetchall()]
         
         else:
@@ -1096,50 +1096,50 @@ def handle_add_data(cursor, conn, data_type, data):
 def handle_edit_data(cursor, conn, data_type, data):
     if data_type == 'categories':
         # Get old category name for cascading updates
-        cursor.execute('SELECT category_name FROM categories WHERE id = ?', (data['id'],))
+        cursor.execute('SELECT name FROM categories WHERE id = ?', (data['id'],))
         old_category = cursor.fetchone()
         old_category_name = old_category[0] if old_category else None
         
         # Update category
-        cursor.execute('UPDATE categories SET category_name = ? WHERE id = ?',
+        cursor.execute('UPDATE categories SET name = ? WHERE id = ?',
                       (data['name'], data['id']))
         
         # Cascading update: Update all related tables
         if old_category_name and old_category_name != data['name']:
-            cursor.execute('UPDATE models SET category_name = ? WHERE category_name = ?',
+            cursor.execute('UPDATE models SET name = ? WHERE name = ?',
                           (data['name'], old_category_name))
-            cursor.execute('UPDATE display_types SET category_name = ? WHERE category_name = ?',
+            cursor.execute('UPDATE display_types SET name = ? WHERE name = ?',
                           (data['name'], old_category_name))
-            cursor.execute('UPDATE pop_materials_db SET category_name = ? WHERE category_name = ?',
+            cursor.execute('UPDATE pop_materials_db SET name = ? WHERE name = ?',
                           (data['name'], old_category_name))
             cursor.execute('UPDATE data_entries SET model = REPLACE(model, ?, ?) WHERE model LIKE ?',
                           (old_category_name, data['name'], f"{old_category_name} - %"))
     
     elif data_type == 'models':
         # Get old model name for cascading updates
-        cursor.execute('SELECT model_name FROM models WHERE id = ?', (data['id'],))
+        cursor.execute('SELECT name FROM models WHERE id = ?', (data['id'],))
         old_model = cursor.fetchone()
         old_model_name = old_model[0] if old_model else None
         
         # Update model
-        cursor.execute('UPDATE models SET model_name = ?, category_name = ? WHERE id = ?',
+        cursor.execute('UPDATE models SET model_name = ?, name = ? WHERE id = ?',
                       (data['name'], data['category'], data['id']))
         
         # Cascading update: Update all POP materials and data entries with this model
         if old_model_name and old_model_name != data['name']:
-            cursor.execute('UPDATE pop_materials_db SET model_name = ?, category_name = ? WHERE model_name = ?',
+            cursor.execute('UPDATE pop_materials_db SET model_name = ?, name = ? WHERE name = ?',
                           (data['name'], data['category'], old_model_name))
             cursor.execute('UPDATE data_entries SET model = ? WHERE model = ?',
                           (f"{data['category']} - {data['name']}", f"{data['category']} - {old_model_name}"))
     
     elif data_type == 'display_types':
         # Get old display type name for cascading updates
-        cursor.execute('SELECT display_type_name FROM display_types WHERE id = ?', (data['id'],))
+        cursor.execute('SELECT name FROM display_types WHERE id = ?', (data['id'],))
         old_display_type = cursor.fetchone()
         old_display_type_name = old_display_type[0] if old_display_type else None
         
         # Update display type
-        cursor.execute('UPDATE display_types SET display_type_name = ?, category_name = ? WHERE id = ?',
+        cursor.execute('UPDATE display_types SET display_type_name = ?, name = ? WHERE id = ?',
                       (data['name'], data['category'], data['id']))
         
         # Cascading update: Update all data entries with this display type
@@ -1148,7 +1148,7 @@ def handle_edit_data(cursor, conn, data_type, data):
                           (data['name'], old_display_type_name))
     
     elif data_type == 'pop_materials':
-        cursor.execute('UPDATE pop_materials_db SET material_name = ?, model_name = ?, category_name = ? WHERE id = ?',
+        cursor.execute('UPDATE pop_materials_db SET material_name = ?, model_name = ?, name = ? WHERE id = ?',
                       (data['name'], data['model'], data['category'], data['id']))
     
     conn.commit()
@@ -1158,7 +1158,7 @@ def handle_edit_data(cursor, conn, data_type, data):
 def handle_delete_data(cursor, conn, data_type, data):
     if data_type == 'categories':
         # Get category name before deletion for cascading deletes
-        cursor.execute('SELECT category_name FROM categories WHERE id = ?', (data['id'],))
+        cursor.execute('SELECT name FROM categories WHERE id = ?', (data['id'],))
         category_result = cursor.fetchone()
         category_name = category_result[0] if category_result else None
         
@@ -1167,13 +1167,13 @@ def handle_delete_data(cursor, conn, data_type, data):
         
         # Cascading delete: Remove all related data
         if category_name:
-            cursor.execute('DELETE FROM models WHERE category_name = ?', (category_name,))
-            cursor.execute('DELETE FROM display_types WHERE category_name = ?', (category_name,))
-            cursor.execute('DELETE FROM pop_materials_db WHERE category_name = ?', (category_name,))
+            cursor.execute('DELETE FROM models WHERE name = ?', (category_name,))
+            cursor.execute('DELETE FROM display_types WHERE name = ?', (category_name,))
+            cursor.execute('DELETE FROM pop_materials_db WHERE name = ?', (category_name,))
     
     elif data_type == 'models':
         # Get model name before deletion for cascading deletes
-        cursor.execute('SELECT model_name FROM models WHERE id = ?', (data['id'],))
+        cursor.execute('SELECT name FROM models WHERE id = ?', (data['id'],))
         model_result = cursor.fetchone()
         model_name = model_result[0] if model_result else None
         
@@ -1182,7 +1182,7 @@ def handle_delete_data(cursor, conn, data_type, data):
         
         # Cascading delete: Remove all POP materials for this model
         if model_name:
-            cursor.execute('DELETE FROM pop_materials_db WHERE model_name = ?', (model_name,))
+            cursor.execute('DELETE FROM pop_materials_db WHERE name = ?', (model_name,))
     
     elif data_type == 'display_types':
         cursor.execute('DELETE FROM display_types WHERE id = ?', (data['id'],))
@@ -1234,11 +1234,18 @@ def user_management():
     c = conn.cursor()
     
     # Get users with their branches
-    c.execute('''SELECT u.*, GROUP_CONCAT(ub.branch_name, ', ') as branches
-                 FROM users u
-                 LEFT JOIN user_branches ub ON u.id = ub.user_id
-                 GROUP BY u.id
-                 ORDER BY u.is_admin DESC, u.name''')
+    if db_type == 'postgresql':
+        c.execute('''SELECT u.*, STRING_AGG(ub.branch_name, ', ') as branches
+                     FROM users u
+                     LEFT JOIN user_branches ub ON u.id = ub.user_id
+                     GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
+                     ORDER BY u.is_admin DESC, u.username''')
+    else:
+        c.execute('''SELECT u.*, GROUP_CONCAT(ub.branch_name, ', ') as branches
+                     FROM users u
+                     LEFT JOIN user_branches ub ON u.id = ub.user_id
+                     GROUP BY u.id
+                     ORDER BY u.is_admin DESC, u.username''')
     users = c.fetchall()
     
     # Get all unique branches for management
@@ -1414,7 +1421,7 @@ def get_user_branches(user_id):
         c = conn.cursor()
         
         # Get user's current branches
-        c.execute('SELECT branch_name FROM user_branches WHERE user_id = ? ORDER BY branch_name_name', (user_id,))
+        c.execute('SELECT branch_name FROM user_branches WHERE user_id = ? ORDER BY branch_name', (user_id,))
         user_branches = [row[0] for row in c.fetchall()]
         
         # Get all available branches

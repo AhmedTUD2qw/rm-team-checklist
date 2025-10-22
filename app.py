@@ -764,7 +764,7 @@ def admin_dashboard():
         query += ' AND date <= ?'
         params.append(date_to + ' 23:59:59')
     
-    query += ' ORDER BY date DESC'
+    query += ' ORDER BY created_at DESC'
     
     # Execute query
     conn, db_type = get_db_connection()
@@ -776,7 +776,7 @@ def admin_dashboard():
     c.execute('SELECT DISTINCT employee_name FROM data_entries ORDER BY employee_name')
     employees = [row[0] for row in c.fetchall()]
     
-    c.execute('SELECT DISTINCT branch FROM data_entries ORDER BY branch')
+    c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch')
     branches = [row[0] for row in c.fetchall()]
     
     c.execute('SELECT DISTINCT model FROM data_entries ORDER BY model')
@@ -837,7 +837,7 @@ def export_excel():
             query += ' AND date <= ?'
             params.append(date_to + ' 23:59:59')
         
-        query += ' ORDER BY date DESC'
+        query += ' ORDER BY created_at DESC'
         
         # تنفيذ الاستعلام
         conn, db_type = get_db_connection()
@@ -918,7 +918,7 @@ def export_excel_simple():
             query += ' AND date <= ?'
             params.append(date_to + ' 23:59:59')
         
-        query += ' ORDER BY date DESC'
+        query += ' ORDER BY created_at DESC'
         
         # تنفيذ الاستعلام
         conn, db_type = get_db_connection()
@@ -1242,7 +1242,7 @@ def user_management():
     users = c.fetchall()
     
     # Get all unique branches for management
-    c.execute('SELECT DISTINCT branch FROM data_entries ORDER BY branch')
+    c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch')
     all_branches = [row[0] for row in c.fetchall()]
     
     conn.close()
@@ -1418,7 +1418,7 @@ def get_user_branches(user_id):
         user_branches = [row[0] for row in c.fetchall()]
         
         # Get all available branches
-        c.execute('SELECT DISTINCT branch FROM data_entries ORDER BY branch')
+        c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch')
         all_branches = [row[0] for row in c.fetchall()]
         
         conn.close()

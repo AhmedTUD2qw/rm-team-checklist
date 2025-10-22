@@ -8,7 +8,7 @@
         <h2>RM Team Check list - Admin Dashboard</h2>
         <div class="admin-actions">
             <a href="{{ url_for('admin_management') }}" class="btn btn-primary">Data Management</a>
-            <a href="{{ url_for('user_management') }}" class="btn btn-primary">User Management</a>
+            <a href="{{ url_for('admin_management') }}" class="btn btn-primary">User Management</a>
             <a href="{{ url_for('export_excel', employee=filters.employee, branch=filters.branch, model=filters.model, date_from=filters.date_from, date_to=filters.date_to) }}" 
                class="export-excel-btn" title="تصدير محسن مع الصور والتنسيق الاحترافي">
                 🖼️ Export Enhanced Excel (with Images & Formatting)

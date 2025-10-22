@@ -44,37 +44,7 @@ IS_PRODUCTION = DATABASE_URL is not None
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Initialize database on startup (for production)
-if IS_PRODUCTION:
-    try:
-        print("🔧 Initializing production database...")
-        # Initialize database directly without external import
-        conn, db_type = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Create tables if they don't exist
-        if db_type == 'postgresql':
-            cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(80) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                employee_name VARCHAR(100) NOT NULL,
-                employee_code VARCHAR(50) UNIQUE NOT NULL,
-                is_admin BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )''')
-            
-            cursor.execute('''CREATE TABLE IF NOT EXISTS categories (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) UNIQUE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )''')
-        
-        conn.commit()
-        conn.close()
-        print("✅ Production database initialized")
-    except Exception as e:
-        print(f"⚠️ Database initialization warning: {e}")
+# Production database initialization will be done after function definitions
 
 def get_db_connection():
     """Get database connection based on environment"""
@@ -389,7 +359,47 @@ def data_entry():
 def admin_dashboard():
     if 'user_id' not in session or not session.get('is_admin'):
         return redirect(url_for('index'))
-    return render_template('admin_dashboard.html')
+    
+    try:
+        # Get basic data for dashboard
+        conn, db_type = get_db_connection()
+        c = conn.cursor()
+        
+        # Get all data entries
+        c.execute('SELECT * FROM data_entries ORDER BY created_at DESC LIMIT 100')
+        data_entries = c.fetchall()
+        
+        # Get unique values for filters
+        employees = list(set([entry[1] for entry in data_entries if entry[1]]))  # employee_name
+        branches = list(set([entry[3] for entry in data_entries if entry[3]]))   # branch_name
+        models = list(set([entry[6] for entry in data_entries if entry[6]]))     # model
+        
+        conn.close()
+        
+        # Create filters object
+        filters = {
+            'employee': '',
+            'branch': '',
+            'model': '',
+            'date_from': '',
+            'date_to': ''
+        }
+        
+        return render_template('admin_dashboard.html', 
+                             data_entries=data_entries,
+                             employees=employees,
+                             branches=branches,
+                             models=models,
+                             filters=filters)
+    except Exception as e:
+        print(f"Admin dashboard error: {e}")
+        # Return simple dashboard without data
+        return render_template('admin_dashboard.html', 
+                             data_entries=[],
+                             employees=[],
+                             branches=[],
+                             models=[],
+                             filters={'employee': '', 'branch': '', 'model': '', 'date_from': '', 'date_to': ''})
 
 @app.route('/admin_management')
 def admin_management():
@@ -717,6 +727,109 @@ def manage_data():
     except Exception as e:
         print(f"Error in manage_data: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/export_excel')
+def export_excel():
+    """Export data to Excel with images"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return redirect(url_for('index'))
+    
+    try:
+        # Simple Excel export for now
+        conn, db_type = get_db_connection()
+        c = conn.cursor()
+        c.execute('SELECT * FROM data_entries ORDER BY created_at DESC')
+        data = c.fetchall()
+        conn.close()
+        
+        # Create simple Excel file
+        import pandas as pd
+        from io import BytesIO
+        
+        df = pd.DataFrame(data, columns=[
+            'ID', 'User ID', 'Employee Name', 'Employee Code', 'Branch Name', 
+            'Shop Code', 'Category', 'Model', 'Display Type', 'Selected Materials', 
+            'Missing Materials', 'Image URLs', 'Created At'
+        ])
+        
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Data Entries', index=False)
+        
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'data_entries_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+    except Exception as e:
+        flash(f'Export error: {str(e)}')
+        return redirect(url_for('admin_dashboard'))
+
+@app.route('/export_excel_simple')
+def export_excel_simple():
+    """Simple Excel export"""
+    return redirect(url_for('export_excel'))
+
+@app.route('/delete_entry/<int:entry_id>', methods=['DELETE'])
+def delete_entry(entry_id):
+    """Delete data entry"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    try:
+        conn, db_type = get_db_connection()
+        cursor = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        cursor.execute(f'DELETE FROM data_entries WHERE id = {placeholder}', (entry_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Entry deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/download_image/<filename>')
+def download_image(filename):
+    """Download image file"""
+    try:
+        return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename), as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
+
+# Initialize production database after all functions are defined
+if IS_PRODUCTION:
+    try:
+        print("🔧 Initializing production database...")
+        conn, db_type = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Create tables if they don't exist
+        if db_type == 'postgresql':
+            cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                employee_name VARCHAR(100) NOT NULL,
+                employee_code VARCHAR(50) UNIQUE NOT NULL,
+                is_admin BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+            
+            cursor.execute('''CREATE TABLE IF NOT EXISTS categories (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+        
+        conn.commit()
+        conn.close()
+        print("✅ Production database initialized")
+    except Exception as e:
+        print(f"⚠️ Database initialization warning: {e}")
 
 if __name__ == '__main__':
     init_db()

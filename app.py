@@ -56,6 +56,37 @@ if IS_PRODUCTION:
 DATABASE_URL = os.getenv('DATABASE_URL')
 IS_PRODUCTION = DATABASE_URL is not None
 
+def execute_query(query, params=None, fetch_one=False, fetch_all=False):
+    """Execute query with proper database handling"""
+    conn, db_type = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Convert SQLite syntax to PostgreSQL if needed
+        if db_type == 'postgresql':
+            query = query.replace('?', '%s')
+        
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        
+        if fetch_one:
+            result = cursor.fetchone()
+        elif fetch_all:
+            result = cursor.fetchall()
+        else:
+            result = cursor.rowcount
+            
+        conn.commit()
+        return result
+        
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
 def get_db_connection():
     """Get database connection based on environment"""
     if IS_PRODUCTION and DATABASE_URL and PSYCOPG2_AVAILABLE:
@@ -393,11 +424,8 @@ def login():
     password = request.form['password']
     remember_me = 'remember_me' in request.form
     
-    conn, db_type = get_db_connection()
-    c = conn.cursor()
-    c.execute('SELECT * FROM users WHERE name = ? AND company_code = ?', (name, company_code))
-    user = c.fetchone()
-    conn.close()
+    user = execute_query('SELECT * FROM users WHERE username = ? AND employee_code = ?', 
+                        (name, company_code), fetch_one=True)
     
     if user and check_password_hash(user[3], password):
         session['user_id'] = user[0]

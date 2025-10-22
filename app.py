@@ -47,9 +47,32 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Initialize database on startup (for production)
 if IS_PRODUCTION:
     try:
-        from init_database import initialize_database
         print("🔧 Initializing production database...")
-        initialize_database()
+        # Initialize database directly without external import
+        conn, db_type = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Create tables if they don't exist
+        if db_type == 'postgresql':
+            cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                employee_name VARCHAR(100) NOT NULL,
+                employee_code VARCHAR(50) UNIQUE NOT NULL,
+                is_admin BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+            
+            cursor.execute('''CREATE TABLE IF NOT EXISTS categories (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+        
+        conn.commit()
+        conn.close()
+        print("✅ Production database initialized")
     except Exception as e:
         print(f"⚠️ Database initialization warning: {e}")
 
@@ -286,7 +309,10 @@ def initialize_default_data(cursor, conn, db_type):
     placeholder = '%s' if db_type == 'postgresql' else '?'
     
     # Check if admin user exists
-    cursor.execute('SELECT COUNT(*) FROM users WHERE is_admin = TRUE')
+    if db_type == 'postgresql':
+        cursor.execute('SELECT COUNT(*) FROM users WHERE is_admin = true')
+    else:
+        cursor.execute('SELECT COUNT(*) FROM users WHERE is_admin = 1')
     admin_count = cursor.fetchone()[0]
     
     if admin_count == 0:
@@ -303,8 +329,12 @@ def initialize_default_data(cursor, conn, db_type):
     ]
     
     for category in categories:
-        cursor.execute(f'INSERT OR IGNORE INTO categories (name, created_at) VALUES ({placeholder}, {placeholder})',
-                      (category, current_time))
+        if db_type == 'postgresql':
+            cursor.execute(f'INSERT INTO categories (name, created_at) VALUES ({placeholder}, {placeholder}) ON CONFLICT (name) DO NOTHING',
+                          (category, current_time))
+        else:
+            cursor.execute(f'INSERT OR IGNORE INTO categories (name, created_at) VALUES ({placeholder}, {placeholder})',
+                          (category, current_time))
     
     conn.commit()
 
@@ -315,28 +345,33 @@ def index():
 
 @app.route('/login', methods=['POST'])
 def login():
-    name = request.form['name']
-    company_code = request.form['company_code']
-    password = request.form['password']
-    remember_me = 'remember_me' in request.form
-    
-    user = execute_query('SELECT * FROM users WHERE username = ? AND employee_code = ?', 
-                        (name, company_code), fetch_one=True)
-    
-    if user and check_password_hash(user[2], password):  # user[2] is password_hash
-        session['user_id'] = user[0]
-        session['user_name'] = user[1]  # username
-        session['employee_name'] = user[3]  # employee_name
-        session['company_code'] = user[4]  # employee_code
-        session['is_admin'] = user[5]  # is_admin
-        session.permanent = remember_me
+    try:
+        name = request.form['name']
+        company_code = request.form['company_code']
+        password = request.form['password']
+        remember_me = 'remember_me' in request.form
         
-        if user[5]:  # is_admin
-            return redirect(url_for('admin_dashboard'))
+        user = execute_query('SELECT * FROM users WHERE username = ? AND employee_code = ?', 
+                            (name, company_code), fetch_one=True)
+        
+        if user and check_password_hash(user[2], password):  # user[2] is password_hash
+            session['user_id'] = user[0]
+            session['user_name'] = user[1]  # username
+            session['employee_name'] = user[3]  # employee_name
+            session['company_code'] = user[4]  # employee_code
+            session['is_admin'] = user[5]  # is_admin
+            session.permanent = remember_me
+            
+            if user[5]:  # is_admin
+                return redirect(url_for('admin_dashboard'))
+            else:
+                return redirect(url_for('data_entry'))
         else:
-            return redirect(url_for('data_entry'))
-    else:
-        flash('Invalid credentials')
+            flash('Invalid credentials')
+            return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Login error: {e}")
+        flash('Login error occurred. Please try again.')
         return redirect(url_for('index'))
 
 @app.route('/logout')

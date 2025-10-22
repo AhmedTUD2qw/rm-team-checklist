@@ -41,8 +41,11 @@ def populate_clean_data():
                 category_id = category_result[0]
                 
                 for model_name in model_list:
-                    cursor.execute('INSERT OR IGNORE INTO models (name, category_id, created_at) VALUES (?, ?, ?)',
-                                 (model_name, category_id, current_time))
+                    try:
+                        cursor.execute('INSERT INTO models (name, category_id, created_at) VALUES (?, ?, ?)',
+                                     (model_name, category_id, current_time))
+                    except:
+                        pass  # Model already exists
         
         # تعبئة أنواع العرض
         display_types_data = {
@@ -68,8 +71,11 @@ def populate_clean_data():
                 category_id = category_result[0]
                 
                 for display_name in display_list:
-                    cursor.execute('INSERT OR IGNORE INTO display_types (name, category_id, created_at) VALUES (?, ?, ?)',
-                                 (display_name, category_id, current_time))
+                    try:
+                        cursor.execute('INSERT INTO display_types (name, category_id, created_at) VALUES (?, ?, ?)',
+                                     (display_name, category_id, current_time))
+                    except:
+                        pass  # Display type already exists
         
         # تعبئة مواد POP
         pop_materials_data = {
@@ -196,8 +202,11 @@ def populate_clean_data():
                 model_id = model_result[0]
                 
                 for material in materials:
-                    cursor.execute('INSERT OR IGNORE INTO pop_materials (name, model_id, created_at) VALUES (?, ?, ?)',
-                                 (material, model_id, current_time))
+                    try:
+                        cursor.execute('INSERT INTO pop_materials (name, model_id, created_at) VALUES (?, ?, ?)',
+                                     (material, model_id, current_time))
+                    except:
+                        pass  # Material already exists
         
         conn.commit()
         

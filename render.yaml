@@ -2,8 +2,10 @@ services:
   - type: web
     name: rm-team-checklist
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    region: oregon
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app --workers 1 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -20,5 +22,6 @@ services:
     name: rm-checklist-db
     env: postgresql
     plan: free
+    region: oregon
     databaseName: rm_checklist
     databaseUser: rm_user

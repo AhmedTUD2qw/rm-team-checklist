@@ -66,6 +66,13 @@ logs/
 test_*.py
 *_test.py
 
+# Development requirements
+requirements-dev.txt
+
+# Build files
+build/
+*.egg-info/
+
 # Temporary files
 *.tmp
 *.temp

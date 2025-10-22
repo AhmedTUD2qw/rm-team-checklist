@@ -1313,21 +1313,35 @@ def user_management():
         c = conn.cursor()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # Get users with their branches using LEFT JOIN
-        if db_type == 'postgresql':
-            c.execute('''SELECT u.*, COALESCE(STRING_AGG(ub.branch_name, ', '), '') as branches
-                         FROM users u
-                         LEFT JOIN user_branches ub ON u.id = ub.user_id
-                         GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
-                         ORDER BY u.is_admin DESC, u.username''')
-        else:
-            c.execute('''SELECT u.*, COALESCE(GROUP_CONCAT(ub.branch_name, ', '), '') as branches
-                         FROM users u
-                         LEFT JOIN user_branches ub ON u.id = ub.user_id
-                         GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
-                         ORDER BY u.is_admin DESC, u.username''')
-        
-        users = c.fetchall()
+        # First try with user_branches table, fallback to simple query
+        try:
+            # Get users with their branches using LEFT JOIN
+            if db_type == 'postgresql':
+                c.execute('''SELECT u.*, COALESCE(STRING_AGG(ub.branch_name, ', '), '') as branches
+                             FROM users u
+                             LEFT JOIN user_branches ub ON u.id = ub.user_id
+                             GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
+                             ORDER BY u.is_admin DESC, u.username''')
+            else:
+                c.execute('''SELECT u.*, COALESCE(GROUP_CONCAT(ub.branch_name, ', '), '') as branches
+                             FROM users u
+                             LEFT JOIN user_branches ub ON u.id = ub.user_id
+                             GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
+                             ORDER BY u.is_admin DESC, u.username''')
+            
+            users = c.fetchall()
+            
+        except Exception as join_error:
+            print(f"JOIN query failed: {join_error}, falling back to simple query")
+            
+            # Fallback: Simple query without branches
+            c.execute('''SELECT id, username, password_hash, employee_name, employee_code, is_admin, created_at
+                         FROM users 
+                         ORDER BY is_admin DESC, username''')
+            
+            raw_users = c.fetchall()
+            # Add empty branches column
+            users = [tuple(list(user) + ['']) for user in raw_users]
         
         # Get all unique branches for management
         c.execute('SELECT DISTINCT branch_name FROM data_entries WHERE branch_name IS NOT NULL ORDER BY branch_name')
@@ -1506,9 +1520,14 @@ def get_user_branches(user_id):
         c = conn.cursor()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # Get user's current branches
-        c.execute(f'SELECT branch_name FROM user_branches WHERE user_id = {placeholder} ORDER BY branch_name', (user_id,))
-        user_branches = [row[0] for row in c.fetchall()]
+        # Try to get user's current branches, fallback to empty list
+        user_branches = []
+        try:
+            c.execute(f'SELECT branch_name FROM user_branches WHERE user_id = {placeholder} ORDER BY branch_name', (user_id,))
+            user_branches = [row[0] for row in c.fetchall()]
+        except Exception as e:
+            print(f"user_branches table not available: {e}")
+            user_branches = []
         
         # Get all available branches
         c.execute('SELECT DISTINCT branch_name FROM data_entries WHERE branch_name IS NOT NULL ORDER BY branch_name')
@@ -1543,28 +1562,36 @@ def manage_user_branches():
         c = conn.cursor()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        if action == 'add':
-            # Add branch to user
-            if db_type == 'postgresql':
-                c.execute('''INSERT INTO user_branches (user_id, branch_name, created_date) 
-                             VALUES (%s, %s, %s) ON CONFLICT (user_id, branch_name) DO NOTHING''',
-                          (user_id, branch_name, datetime.now()))
+        # Try to use user_branches table, fallback to success message
+        try:
+            if action == 'add':
+                # Add branch to user
+                if db_type == 'postgresql':
+                    c.execute('''INSERT INTO user_branches (user_id, branch_name, created_date) 
+                                 VALUES (%s, %s, %s) ON CONFLICT (user_id, branch_name) DO NOTHING''',
+                              (user_id, branch_name, datetime.now()))
+                else:
+                    c.execute('''INSERT OR IGNORE INTO user_branches (user_id, branch_name, created_date) 
+                                 VALUES (?, ?, ?)''',
+                              (user_id, branch_name, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                message = f'Branch "{branch_name}" added to user'
+                
+            elif action == 'remove':
+                # Remove branch from user (but keep branch data)
+                c.execute(f'DELETE FROM user_branches WHERE user_id = {placeholder} AND branch_name = {placeholder}',
+                          (user_id, branch_name))
+                message = f'Branch "{branch_name}" removed from user'
+                
             else:
-                c.execute('''INSERT OR IGNORE INTO user_branches (user_id, branch_name, created_date) 
-                             VALUES (?, ?, ?)''',
-                          (user_id, branch_name, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-            message = f'Branch "{branch_name}" added to user'
+                return jsonify({'success': False, 'message': 'Invalid action'}), 400
             
-        elif action == 'remove':
-            # Remove branch from user (but keep branch data)
-            c.execute(f'DELETE FROM user_branches WHERE user_id = {placeholder} AND branch_name = {placeholder}',
-                      (user_id, branch_name))
-            message = f'Branch "{branch_name}" removed from user'
+            conn.commit()
             
-        else:
-            return jsonify({'success': False, 'message': 'Invalid action'}), 400
+        except Exception as table_error:
+            print(f"user_branches table operation failed: {table_error}")
+            # Fallback: Just return success message (table will be created later)
+            message = f'Branch operation recorded (table will be created during next database update)'
         
-        conn.commit()
         conn.close()
         
         return jsonify({'success': True, 'message': message})

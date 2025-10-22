@@ -512,12 +512,12 @@ def get_branches():
             c.execute('''SELECT branch_name, shop_code FROM branches 
                         WHERE employee_code = ? AND 
                         (branch_name LIKE ? OR shop_code LIKE ?) 
-                        ORDER BY branch_name''', 
+                        ORDER BY branch_name_name''', 
                      (employee_code, f'%{search_term}%', f'%{search_term}%'))
         else:
             c.execute('''SELECT branch_name, shop_code FROM branches 
                         WHERE employee_code = ? 
-                        ORDER BY branch_name''', 
+                        ORDER BY branch_name_name''', 
                      (employee_code,))
         
         branches = [{'name': row[0], 'code': row[1]} for row in c.fetchall()]
@@ -776,7 +776,7 @@ def admin_dashboard():
     c.execute('SELECT DISTINCT employee_name FROM data_entries ORDER BY employee_name')
     employees = [row[0] for row in c.fetchall()]
     
-    c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch')
+    c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch_name')
     branches = [row[0] for row in c.fetchall()]
     
     c.execute('SELECT DISTINCT model FROM data_entries ORDER BY model')
@@ -1242,7 +1242,7 @@ def user_management():
     users = c.fetchall()
     
     # Get all unique branches for management
-    c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch')
+    c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch_name')
     all_branches = [row[0] for row in c.fetchall()]
     
     conn.close()
@@ -1414,11 +1414,11 @@ def get_user_branches(user_id):
         c = conn.cursor()
         
         # Get user's current branches
-        c.execute('SELECT branch_name FROM user_branches WHERE user_id = ? ORDER BY branch_name', (user_id,))
+        c.execute('SELECT branch_name FROM user_branches WHERE user_id = ? ORDER BY branch_name_name', (user_id,))
         user_branches = [row[0] for row in c.fetchall()]
         
         # Get all available branches
-        c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch')
+        c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch_name')
         all_branches = [row[0] for row in c.fetchall()]
         
         conn.close()

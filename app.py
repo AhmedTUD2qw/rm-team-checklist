@@ -1004,61 +1004,114 @@ def get_management_data(data_type):
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
         if data_type == 'categories':
-            c.execute('SELECT * FROM categories ORDER BY name')
-            data = [{'id': row[0], 'name': row[1], 'created_at': row[2]} for row in c.fetchall()]
+            # Try new schema first, fallback to old schema
+            try:
+                c.execute('SELECT id, name, created_at FROM categories ORDER BY name')
+                data = [{'id': row[0], 'name': row[1], 'created_at': row[2]} for row in c.fetchall()]
+            except:
+                # Fallback to old schema
+                c.execute('SELECT id, category_name, created_date FROM categories ORDER BY category_name')
+                data = [{'id': row[0], 'name': row[1], 'created_at': row[2]} for row in c.fetchall()]
         
         elif data_type == 'models':
             category = request.args.get('category', '')
             if category:
-                # Get category ID first
-                c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
-                cat_result = c.fetchone()
+                # Get category ID first - try both schemas
+                try:
+                    c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                    cat_result = c.fetchone()
+                except:
+                    c.execute(f'SELECT id FROM categories WHERE category_name = {placeholder}', (category,))
+                    cat_result = c.fetchone()
+                
                 if cat_result:
-                    c.execute(f'SELECT * FROM models WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
+                    try:
+                        c.execute(f'SELECT id, name, category_id, created_at FROM models WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
+                        data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                    except:
+                        # Fallback to old schema
+                        c.execute(f'SELECT id, model_name, category_name, created_date FROM models WHERE category_name = {placeholder} ORDER BY model_name', (category,))
+                        data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_at': row[3]} for row in c.fetchall()]
                 else:
-                    c.execute('SELECT * FROM models WHERE 1=0')  # Empty result
+                    data = []
             else:
-                c.execute('SELECT * FROM models ORDER BY name')
-            data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                try:
+                    c.execute('SELECT id, name, category_id, created_at FROM models ORDER BY name')
+                    data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                except:
+                    # Fallback to old schema
+                    c.execute('SELECT id, model_name, category_name, created_date FROM models ORDER BY model_name')
+                    data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_at': row[3]} for row in c.fetchall()]
         
         elif data_type == 'display_types':
             category = request.args.get('category', '')
             if category:
-                # Get category ID first
-                c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
-                cat_result = c.fetchone()
+                # Get category ID first - try both schemas
+                try:
+                    c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                    cat_result = c.fetchone()
+                except:
+                    c.execute(f'SELECT id FROM categories WHERE category_name = {placeholder}', (category,))
+                    cat_result = c.fetchone()
+                
                 if cat_result:
-                    c.execute(f'SELECT * FROM display_types WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
+                    try:
+                        c.execute(f'SELECT id, name, category_id, created_at FROM display_types WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
+                        data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                    except:
+                        # Fallback to old schema
+                        c.execute(f'SELECT id, display_type_name, category_name, created_date FROM display_types WHERE category_name = {placeholder} ORDER BY display_type_name', (category,))
+                        data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_at': row[3]} for row in c.fetchall()]
                 else:
-                    c.execute('SELECT * FROM display_types WHERE 1=0')  # Empty result
+                    data = []
             else:
-                c.execute('SELECT * FROM display_types ORDER BY name')
-            data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                try:
+                    c.execute('SELECT id, name, category_id, created_at FROM display_types ORDER BY name')
+                    data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                except:
+                    # Fallback to old schema
+                    c.execute('SELECT id, display_type_name, category_name, created_date FROM display_types ORDER BY display_type_name')
+                    data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_at': row[3]} for row in c.fetchall()]
         
         elif data_type == 'pop_materials':
             model = request.args.get('model', '')
             category = request.args.get('category', '')
             if model:
-                # Get model ID first
-                c.execute(f'SELECT id FROM models WHERE name = {placeholder}', (model,))
-                model_result = c.fetchone()
-                if model_result:
-                    c.execute(f'SELECT * FROM pop_materials WHERE model_id = {placeholder} ORDER BY name', (model_result[0],))
-                else:
-                    c.execute('SELECT * FROM pop_materials WHERE 1=0')  # Empty result
-                data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                # Try new schema first
+                try:
+                    c.execute(f'SELECT id FROM models WHERE name = {placeholder}', (model,))
+                    model_result = c.fetchone()
+                    if model_result:
+                        c.execute(f'SELECT id, name, model_id, created_at FROM pop_materials WHERE model_id = {placeholder} ORDER BY name', (model_result[0],))
+                        data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                    else:
+                        data = []
+                except:
+                    # Fallback to old schema
+                    c.execute(f'SELECT id, material_name, model_name, created_date FROM pop_materials_db WHERE model_name = {placeholder} ORDER BY material_name', (model,))
+                    data = [{'id': row[0], 'name': row[1], 'model': row[2], 'created_at': row[3]} for row in c.fetchall()]
             elif category:
-                # Get models for category first, then get materials for those models
-                c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
-                cat_result = c.fetchone()
-                if cat_result:
-                    c.execute(f'SELECT pm.* FROM pop_materials pm JOIN models m ON pm.model_id = m.id WHERE m.category_id = {placeholder} ORDER BY pm.name', (cat_result[0],))
-                else:
-                    c.execute('SELECT * FROM pop_materials WHERE 1=0')  # Empty result
-                data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                # Try new schema first
+                try:
+                    c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                    cat_result = c.fetchone()
+                    if cat_result:
+                        c.execute(f'SELECT pm.id, pm.name, pm.model_id, pm.created_at FROM pop_materials pm JOIN models m ON pm.model_id = m.id WHERE m.category_id = {placeholder} ORDER BY pm.name', (cat_result[0],))
+                        data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                    else:
+                        data = []
+                except:
+                    # Fallback to old schema
+                    c.execute(f'SELECT id, material_name, model_name, created_date FROM pop_materials_db WHERE category_name = {placeholder} ORDER BY material_name', (category,))
+                    data = [{'id': row[0], 'name': row[1], 'model': row[2], 'created_at': row[3]} for row in c.fetchall()]
             else:
-                c.execute('SELECT * FROM pop_materials ORDER BY name')
-                data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                try:
+                    c.execute('SELECT id, name, model_id, created_at FROM pop_materials ORDER BY name')
+                    data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
+                except:
+                    # Fallback to old schema
+                    c.execute('SELECT id, material_name, model_name, created_date FROM pop_materials_db ORDER BY material_name')
+                    data = [{'id': row[0], 'name': row[1], 'model': row[2], 'created_at': row[3]} for row in c.fetchall()]
         
         else:
             return jsonify({'success': False, 'message': 'Invalid data type'}), 400
@@ -1262,13 +1315,13 @@ def user_management():
         
         # Get users with their branches using LEFT JOIN
         if db_type == 'postgresql':
-            c.execute('''SELECT u.*, STRING_AGG(ub.branch_name, ', ') as branches
+            c.execute('''SELECT u.*, COALESCE(STRING_AGG(ub.branch_name, ', '), '') as branches
                          FROM users u
                          LEFT JOIN user_branches ub ON u.id = ub.user_id
                          GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
                          ORDER BY u.is_admin DESC, u.username''')
         else:
-            c.execute('''SELECT u.*, GROUP_CONCAT(ub.branch_name, ', ') as branches
+            c.execute('''SELECT u.*, COALESCE(GROUP_CONCAT(ub.branch_name, ', '), '') as branches
                          FROM users u
                          LEFT JOIN user_branches ub ON u.id = ub.user_id
                          GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at

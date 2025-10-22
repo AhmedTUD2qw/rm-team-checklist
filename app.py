@@ -720,7 +720,8 @@ def manage_data():
                 
         except Exception as e:
             conn.rollback()
-            raise e
+            print(f"Database error in manage_data: {e}")
+            return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
         finally:
             conn.close()
             

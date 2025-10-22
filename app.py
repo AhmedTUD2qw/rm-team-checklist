@@ -1001,39 +1001,64 @@ def get_management_data(data_type):
     try:
         conn, db_type = get_db_connection()
         c = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
         
         if data_type == 'categories':
             c.execute('SELECT * FROM categories ORDER BY name')
-            data = [{'id': row[0], 'name': row[1], 'created_date': row[2]} for row in c.fetchall()]
+            data = [{'id': row[0], 'name': row[1], 'created_at': row[2]} for row in c.fetchall()]
         
         elif data_type == 'models':
             category = request.args.get('category', '')
             if category:
-                c.execute('SELECT * FROM models WHERE name = ? ORDER BY model_name', (category,))
+                # Get category ID first
+                c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                cat_result = c.fetchone()
+                if cat_result:
+                    c.execute(f'SELECT * FROM models WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
+                else:
+                    c.execute('SELECT * FROM models WHERE 1=0')  # Empty result
             else:
-                c.execute('SELECT * FROM models ORDER BY name, model_name')
-            data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_date': row[3]} for row in c.fetchall()]
+                c.execute('SELECT * FROM models ORDER BY name')
+            data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
         
         elif data_type == 'display_types':
             category = request.args.get('category', '')
             if category:
-                c.execute('SELECT * FROM display_types WHERE name = ? ORDER BY display_type_name', (category,))
+                # Get category ID first
+                c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                cat_result = c.fetchone()
+                if cat_result:
+                    c.execute(f'SELECT * FROM display_types WHERE category_id = {placeholder} ORDER BY name', (cat_result[0],))
+                else:
+                    c.execute('SELECT * FROM display_types WHERE 1=0')  # Empty result
             else:
-                c.execute('SELECT * FROM display_types ORDER BY name, display_type_name')
-            data = [{'id': row[0], 'name': row[1], 'category': row[2], 'created_date': row[3]} for row in c.fetchall()]
+                c.execute('SELECT * FROM display_types ORDER BY name')
+            data = [{'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
         
         elif data_type == 'pop_materials':
             model = request.args.get('model', '')
             category = request.args.get('category', '')
             if model:
-                c.execute('SELECT * FROM pop_materials_db WHERE name = ? ORDER BY material_name', (model,))
-                data = [{'id': row[0], 'name': row[1], 'model': row[2], 'category': row[3], 'created_date': row[4]} for row in c.fetchall()]
+                # Get model ID first
+                c.execute(f'SELECT id FROM models WHERE name = {placeholder}', (model,))
+                model_result = c.fetchone()
+                if model_result:
+                    c.execute(f'SELECT * FROM pop_materials WHERE model_id = {placeholder} ORDER BY name', (model_result[0],))
+                else:
+                    c.execute('SELECT * FROM pop_materials WHERE 1=0')  # Empty result
+                data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
             elif category:
-                c.execute('SELECT * FROM pop_materials_db WHERE name = ? ORDER BY model_name, material_name', (category,))
-                data = [{'id': row[0], 'name': row[1], 'model': row[2], 'category': row[3], 'created_date': row[4]} for row in c.fetchall()]
+                # Get models for category first, then get materials for those models
+                c.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (category,))
+                cat_result = c.fetchone()
+                if cat_result:
+                    c.execute(f'SELECT pm.* FROM pop_materials pm JOIN models m ON pm.model_id = m.id WHERE m.category_id = {placeholder} ORDER BY pm.name', (cat_result[0],))
+                else:
+                    c.execute('SELECT * FROM pop_materials WHERE 1=0')  # Empty result
+                data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
             else:
-                c.execute('SELECT * FROM pop_materials_db ORDER BY name, model_name, material_name')
-                data = [{'id': row[0], 'name': row[1], 'model': row[2], 'category': row[3], 'created_date': row[4]} for row in c.fetchall()]
+                c.execute('SELECT * FROM pop_materials ORDER BY name')
+                data = [{'id': row[0], 'name': row[1], 'model_id': row[2], 'created_at': row[3]} for row in c.fetchall()]
         
         else:
             return jsonify({'success': False, 'message': 'Invalid data type'}), 400
@@ -1230,31 +1255,38 @@ def user_management():
     if 'user_id' not in session or not session.get('is_admin'):
         return redirect(url_for('index'))
     
-    conn, db_type = get_db_connection()
-    c = conn.cursor()
-    
-    # Get users with their branches
-    if db_type == 'postgresql':
-        c.execute('''SELECT u.*, STRING_AGG(ub.branch_name, ', ') as branches
-                     FROM users u
-                     LEFT JOIN user_branches ub ON u.id = ub.user_id
-                     GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
-                     ORDER BY u.is_admin DESC, u.username''')
-    else:
-        c.execute('''SELECT u.*, GROUP_CONCAT(ub.branch_name, ', ') as branches
-                     FROM users u
-                     LEFT JOIN user_branches ub ON u.id = ub.user_id
-                     GROUP BY u.id
-                     ORDER BY u.is_admin DESC, u.username''')
-    users = c.fetchall()
-    
-    # Get all unique branches for management
-    c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch_name')
-    all_branches = [row[0] for row in c.fetchall()]
-    
-    conn.close()
-    
-    return render_template('user_management.html', users=users, all_branches=all_branches)
+    try:
+        conn, db_type = get_db_connection()
+        c = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        # Get users with their branches using LEFT JOIN
+        if db_type == 'postgresql':
+            c.execute('''SELECT u.*, STRING_AGG(ub.branch_name, ', ') as branches
+                         FROM users u
+                         LEFT JOIN user_branches ub ON u.id = ub.user_id
+                         GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
+                         ORDER BY u.is_admin DESC, u.username''')
+        else:
+            c.execute('''SELECT u.*, GROUP_CONCAT(ub.branch_name, ', ') as branches
+                         FROM users u
+                         LEFT JOIN user_branches ub ON u.id = ub.user_id
+                         GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
+                         ORDER BY u.is_admin DESC, u.username''')
+        
+        users = c.fetchall()
+        
+        # Get all unique branches for management
+        c.execute('SELECT DISTINCT branch_name FROM data_entries WHERE branch_name IS NOT NULL ORDER BY branch_name')
+        all_branches = [row[0] for row in c.fetchall()]
+        
+        conn.close()
+        
+        return render_template('user_management.html', users=users, all_branches=all_branches)
+        
+    except Exception as e:
+        print(f"Error in user_management: {e}")
+        return f"Error loading user management: {str(e)}", 500
 
 @app.route('/manage_user', methods=['POST'])
 def manage_user():
@@ -1419,13 +1451,14 @@ def get_user_branches(user_id):
     try:
         conn, db_type = get_db_connection()
         c = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
         
         # Get user's current branches
-        c.execute('SELECT branch_name FROM user_branches WHERE user_id = ? ORDER BY branch_name', (user_id,))
+        c.execute(f'SELECT branch_name FROM user_branches WHERE user_id = {placeholder} ORDER BY branch_name', (user_id,))
         user_branches = [row[0] for row in c.fetchall()]
         
         # Get all available branches
-        c.execute('SELECT DISTINCT branch_name FROM data_entries ORDER BY branch_name')
+        c.execute('SELECT DISTINCT branch_name FROM data_entries WHERE branch_name IS NOT NULL ORDER BY branch_name')
         all_branches = [row[0] for row in c.fetchall()]
         
         conn.close()
@@ -1455,17 +1488,23 @@ def manage_user_branches():
         
         conn, db_type = get_db_connection()
         c = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
         
         if action == 'add':
             # Add branch to user
-            c.execute('''INSERT OR IGNORE INTO user_branches (user_id, branch_name, created_date) 
-                         VALUES (?, ?, ?)''',
-                      (user_id, branch_name, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            if db_type == 'postgresql':
+                c.execute('''INSERT INTO user_branches (user_id, branch_name, created_date) 
+                             VALUES (%s, %s, %s) ON CONFLICT (user_id, branch_name) DO NOTHING''',
+                          (user_id, branch_name, datetime.now()))
+            else:
+                c.execute('''INSERT OR IGNORE INTO user_branches (user_id, branch_name, created_date) 
+                             VALUES (?, ?, ?)''',
+                          (user_id, branch_name, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
             message = f'Branch "{branch_name}" added to user'
             
         elif action == 'remove':
             # Remove branch from user (but keep branch data)
-            c.execute('DELETE FROM user_branches WHERE user_id = ? AND branch_name = ?',
+            c.execute(f'DELETE FROM user_branches WHERE user_id = {placeholder} AND branch_name = {placeholder}',
                       (user_id, branch_name))
             message = f'Branch "{branch_name}" removed from user'
             

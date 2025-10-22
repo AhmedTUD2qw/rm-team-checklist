@@ -142,6 +142,29 @@ def create_tables():
                 )
             ''')
 
+        # User branches table
+        if db_type == 'postgresql':
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_branches (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    branch_name VARCHAR(200) NOT NULL,
+                    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, branch_name)
+                )
+            ''')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_branches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    branch_name TEXT NOT NULL,
+                    created_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                    UNIQUE(user_id, branch_name)
+                )
+            ''')
+
         # Data entries table
         if db_type == 'postgresql':
             cursor.execute('''

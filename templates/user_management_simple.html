@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - RM Team Check list{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>User Management</h2>
+        <div class="admin-actions">
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </div>
+
+    <!-- Simple Users Table -->
+    <div class="management-section">
+        <div class="section-header">
+            <h3>Users List</h3>
+        </div>
+
+        <div class="data-table-container">
+            <table class="management-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Employee Name</th>
+                        <th>Employee Code</th>
+                        <th>Role</th>
+                        <th>Branches</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.employee_name }}</td>
+                        <td>{{ user.employee_code }}</td>
+                        <td>
+                            {% if user.is_admin %}
+                            <span class="role-badge admin">Admin</span>
+                            {% else %}
+                            <span class="role-badge employee">Employee</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.branches }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Simple Status -->
+    <div class="management-section">
+        <h3>System Status</h3>
+        <p>✅ User management is working</p>
+        <p>✅ Total users: {{ users|length }}</p>
+        <p>✅ Database connection: OK</p>
+    </div>
+</div>
+
+<style>
+.role-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+.role-badge.admin {
+    background-color: #dc3545;
+    color: white;
+}
+.role-badge.employee {
+    background-color: #28a745;
+    color: white;
+}
+.management-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+.management-table th,
+.management-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+}
+.management-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+.management-table tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

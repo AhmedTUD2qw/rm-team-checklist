@@ -7,6 +7,7 @@ from datetime import datetime
 import pandas as pd
 from io import BytesIO
 from dotenv import load_dotenv
+from data_management_routes import handle_manage_data
 try:
     import psycopg2
     from urllib.parse import urlparse
@@ -262,8 +263,14 @@ def initialize_system_data(cursor):
     if admin_count == 0:
         print("🔧 Creating admin user...")
         admin_password = generate_password_hash('admin123')
-        cursor.execute('INSERT INTO users (name, company_code, password, is_admin) VALUES (?, ?, ?, ?)',
-                     ('Admin', 'ADMIN', admin_password, True))
+        # Try new schema first
+        try:
+            cursor.execute('INSERT INTO users (username, password_hash, employee_name, employee_code, is_admin) VALUES (?, ?, ?, ?, ?)',
+                         ('admin', admin_password, 'System Administrator', 'ADMIN001', True))
+        except:
+            # Fallback to old schema
+            cursor.execute('INSERT INTO users (name, company_code, password, is_admin) VALUES (?, ?, ?, ?)',
+                         ('admin', 'ADMIN001', admin_password, True))
         
         # Mark admin as initialized
         cursor.execute('INSERT OR REPLACE INTO db_init_status (component, initialized, last_update) VALUES (?, ?, ?)',
@@ -354,15 +361,21 @@ def login():
     password = request.form['password']
     remember_me = 'remember_me' in request.form
     
-    user = execute_query('SELECT * FROM users WHERE username = ? AND employee_code = ?', 
-                        (name, company_code), fetch_one=True)
+    # Try new schema first, then fallback to old schema
+    try:
+        user = execute_query('SELECT * FROM users WHERE username = ? AND employee_code = ?', 
+                            (name, company_code), fetch_one=True)
+    except:
+        # Fallback to old schema
+        user = execute_query('SELECT * FROM users WHERE name = ? AND company_code = ?', 
+                            (name, company_code), fetch_one=True)
     
     if user and check_password_hash(user[2], password):  # user[2] is password_hash
         session['user_id'] = user[0]
-        session['user_name'] = user[1]  # username
-        session['employee_name'] = user[3]  # employee_name
-        session['company_code'] = user[4]  # employee_code
-        session['is_admin'] = user[5]  # is_admin
+        session['user_name'] = user[1]  # username or name
+        session['employee_name'] = user[1] if len(user) <= 3 else user[3]  # employee_name
+        session['company_code'] = user[4] if len(user) > 4 else company_code  # employee_code or company_code
+        session['is_admin'] = user[5] if len(user) > 5 else (user[4] if len(user) > 4 else False)  # is_admin
         session.permanent = remember_me
         
         if user[5]:  # is_admin
@@ -640,10 +653,28 @@ def submit_data():
             }
             
             # Get all materials for the selected model from database
-            conn_materials = sqlite3.connect('database.db')
+            conn_materials, db_type_materials = get_db_connection()
             c_materials = conn_materials.cursor()
-            c_materials.execute('SELECT name FROM pop_materials_db WHERE name = ?', (model,))
-            model_materials = [row[0] for row in c_materials.fetchall()]
+            
+            # Try new schema first
+            try:
+                # Get model ID first
+                placeholder = '%s' if db_type_materials == 'postgresql' else '?'
+                c_materials.execute(f'SELECT id FROM models WHERE name = {placeholder}', (model,))
+                model_result = c_materials.fetchone()
+                if model_result:
+                    c_materials.execute(f'SELECT name FROM pop_materials WHERE model_id = {placeholder}', (model_result[0],))
+                    model_materials = [row[0] for row in c_materials.fetchall()]
+                else:
+                    model_materials = []
+            except:
+                # Fallback to old schema
+                try:
+                    c_materials.execute(f'SELECT material_name FROM pop_materials_db WHERE model_name = {placeholder}', (model,))
+                    model_materials = [row[0] for row in c_materials.fetchall()]
+                except:
+                    model_materials = []
+            
             conn_materials.close()
             
             # Calculate unselected materials based on model-specific materials
@@ -1202,20 +1233,7 @@ def manage_data():
     
     try:
         data = request.get_json()
-        action = data.get('action')
-        data_type = data.get('type')
-        
-        conn, db_type = get_db_connection()
-        c = conn.cursor()
-        
-        if action == 'add':
-            return handle_add_data(c, conn, data_type, data)
-        elif action == 'edit':
-            return handle_edit_data(c, conn, data_type, data)
-        elif action == 'delete':
-            return handle_delete_data(c, conn, data_type, data)
-        else:
-            return jsonify({'success': False, 'message': 'Invalid action'}), 400
+        return handle_manage_data(data)
             
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500

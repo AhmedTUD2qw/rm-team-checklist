@@ -1311,105 +1311,179 @@ def user_management():
     try:
         conn, db_type = get_db_connection()
         c = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # Simple query - just get basic user info
-        c.execute('SELECT id, username, employee_name, employee_code, is_admin FROM users ORDER BY is_admin DESC, username')
-        raw_users = c.fetchall()
-        
-        # Build simple HTML response
-        html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>User Management</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                table { border-collapse: collapse; width: 100%; }
-                th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                .admin { background-color: #ffebee; }
-                .employee { background-color: #e8f5e8; }
-                .header { margin-bottom: 20px; }
-                .btn { padding: 10px 15px; margin: 5px; text-decoration: none; background-color: #007bff; color: white; border-radius: 4px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>User Management</h1>
-                <a href="/admin_dashboard" class="btn">Back to Dashboard</a>
-                <a href="/logout" class="btn">Logout</a>
-            </div>
+        # Get users with their branches - safe query
+        try:
+            # Try to get users with branches
+            if db_type == 'postgresql':
+                c.execute('''SELECT u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at,
+                             COALESCE(STRING_AGG(ub.branch_name, ', '), '') as branches
+                             FROM users u
+                             LEFT JOIN user_branches ub ON u.id = ub.user_id
+                             GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
+                             ORDER BY u.is_admin DESC, u.username''')
+            else:
+                c.execute('''SELECT u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at,
+                             COALESCE(GROUP_CONCAT(ub.branch_name, ', '), '') as branches
+                             FROM users u
+                             LEFT JOIN user_branches ub ON u.id = ub.user_id
+                             GROUP BY u.id, u.username, u.password_hash, u.employee_name, u.employee_code, u.is_admin, u.created_at
+                             ORDER BY u.is_admin DESC, u.username''')
             
-            <h2>Users List</h2>
-            <table>
-                <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Employee Name</th>
-                    <th>Employee Code</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                </tr>
-        """
-        
-        for user in raw_users:
-            role_class = "admin" if user[4] else "employee"
-            role_text = "Admin" if user[4] else "Employee"
-            html += f"""
-                <tr class="{role_class}">
-                    <td>{user[0]}</td>
-                    <td>{user[1]}</td>
-                    <td>{user[2]}</td>
-                    <td>{user[3]}</td>
-                    <td>{role_text}</td>
-                    <td>Active</td>
-                </tr>
-            """
-        
-        html += """
-            </table>
+            users = c.fetchall()
             
-            <div style="margin-top: 20px;">
-                <h3>System Status</h3>
-                <p>✅ User management is working properly</p>
-                <p>✅ Database connection: OK</p>
-                <p>✅ Total users: """ + str(len(raw_users)) + """</p>
-            </div>
-        </body>
-        </html>
-        """
+        except Exception as join_error:
+            print(f"JOIN query failed: {join_error}, using simple query")
+            # Fallback to simple query
+            c.execute('SELECT id, username, password_hash, employee_name, employee_code, is_admin, created_at FROM users ORDER BY is_admin DESC, username')
+            raw_users = c.fetchall()
+            # Add empty branches column
+            users = [tuple(list(user) + ['']) for user in raw_users]
+        
+        # Get all unique branches for management
+        try:
+            c.execute('SELECT DISTINCT branch_name FROM data_entries WHERE branch_name IS NOT NULL ORDER BY branch_name')
+            all_branches = [row[0] for row in c.fetchall()]
+        except:
+            all_branches = ['Main Branch', 'Secondary Branch']  # Default branches
         
         conn.close()
-        return html
+        
+        return render_template('user_management.html', users=users, all_branches=all_branches)
         
     except Exception as e:
         print(f"Error in user_management: {e}")
-        return f"""
-        <html>
-        <body>
-            <h1>User Management - Error</h1>
-            <p><strong>Error:</strong> {str(e)}</p>
-            <p><a href="/admin_dashboard">Back to Dashboard</a></p>
-            <p><a href="/fix_now">Fix Database Issues</a></p>
-        </body>
-        </html>
-        """
+        return f"Error loading user management: {str(e)}", 500
 
 @app.route('/manage_user', methods=['POST'])
 def manage_user():
     if 'user_id' not in session or not session.get('is_admin'):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
     
-    # Temporarily disabled for debugging
-    return jsonify({'success': False, 'message': 'User management temporarily disabled for maintenance'}), 503
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        
+        conn, db_type = get_db_connection()
+        c = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        if action == 'add':
+            name = data.get('name')
+            company_code = data.get('company_code')
+            password = data.get('password')
+            is_admin = data.get('is_admin', False)
+            
+            # Check if user already exists
+            c.execute(f'SELECT * FROM users WHERE username = {placeholder} OR employee_code = {placeholder}', (name, company_code))
+            if c.fetchone():
+                return jsonify({'success': False, 'message': 'User with this name or company code already exists'})
+            
+            hashed_password = generate_password_hash(password)
+            c.execute(f'INSERT INTO users (username, employee_code, password_hash, employee_name, is_admin) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})',
+                     (name, company_code, hashed_password, name, is_admin))
+            
+        elif action == 'edit':
+            user_id = data.get('id')
+            name = data.get('name')
+            company_code = data.get('company_code')
+            password = data.get('password')
+            is_admin = data.get('is_admin', False)
+            
+            # Check if another user has the same name or company code
+            c.execute(f'SELECT * FROM users WHERE (username = {placeholder} OR employee_code = {placeholder}) AND id != {placeholder}', 
+                     (name, company_code, user_id))
+            if c.fetchone():
+                return jsonify({'success': False, 'message': 'Another user with this name or company code already exists'})
+            
+            if password:
+                # Update with new password
+                hashed_password = generate_password_hash(password)
+                c.execute(f'UPDATE users SET username = {placeholder}, employee_code = {placeholder}, employee_name = {placeholder}, password_hash = {placeholder}, is_admin = {placeholder} WHERE id = {placeholder}',
+                         (name, company_code, name, hashed_password, is_admin, user_id))
+            else:
+                # Update without changing password
+                c.execute(f'UPDATE users SET username = {placeholder}, employee_code = {placeholder}, employee_name = {placeholder}, is_admin = {placeholder} WHERE id = {placeholder}',
+                         (name, company_code, name, is_admin, user_id))
+            
+        elif action == 'delete':
+            user_id = data.get('id')
+            
+            # Prevent deleting the current admin user
+            if user_id == session['user_id']:
+                return jsonify({'success': False, 'message': 'Cannot delete your own account'})
+            
+            # Check if this is the last admin
+            c.execute('SELECT COUNT(*) FROM users WHERE is_admin = TRUE')
+            admin_count = c.fetchone()[0]
+            
+            c.execute(f'SELECT is_admin FROM users WHERE id = {placeholder}', (user_id,))
+            user_to_delete = c.fetchone()
+            
+            if user_to_delete and user_to_delete[0] and admin_count <= 1:
+                return jsonify({'success': False, 'message': 'Cannot delete the last admin user'})
+            
+            # Delete user's data entries and branches
+            c.execute(f'SELECT employee_code FROM users WHERE id = {placeholder}', (user_id,))
+            user_data = c.fetchone()
+            if user_data:
+                employee_code = user_data[0]
+                
+                # Delete user branches
+                try:
+                    c.execute(f'DELETE FROM user_branches WHERE user_id = {placeholder}', (user_id,))
+                except:
+                    pass  # Table might not exist
+                
+                # Delete data entries
+                try:
+                    c.execute(f'DELETE FROM data_entries WHERE employee_code = {placeholder}', (employee_code,))
+                except:
+                    pass
+            
+            # Delete the user
+            c.execute(f'DELETE FROM users WHERE id = {placeholder}', (user_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': f'User {action}ed successfully'})
+        
+    except Exception as e:
+        print(f"Error in manage_user: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/change_admin_password', methods=['POST'])
 def change_admin_password():
     if 'user_id' not in session or not session.get('is_admin'):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
     
-    # Temporarily disabled for debugging
-    return jsonify({'success': False, 'message': 'Password change temporarily disabled for maintenance'}), 503
+    try:
+        data = request.get_json()
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        conn, db_type = get_db_connection()
+        c = conn.cursor()
+        placeholder = '%s' if db_type == 'postgresql' else '?'
+        
+        c.execute(f'SELECT password_hash FROM users WHERE id = {placeholder}', (session['user_id'],))
+        user = c.fetchone()
+        
+        if not user or not check_password_hash(user[0], current_password):
+            return jsonify({'success': False, 'message': 'Current password is incorrect'})
+        
+        hashed_password = generate_password_hash(new_password)
+        c.execute(f'UPDATE users SET password_hash = {placeholder} WHERE id = {placeholder}', (hashed_password, session['user_id']))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Password changed successfully'})
+        
+    except Exception as e:
+        print(f"Error in change_admin_password: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -1429,18 +1503,47 @@ def get_user_branches(user_id):
         c = conn.cursor()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # Try to get user's current branches, fallback to empty list
+        # Ensure user_branches table exists
+        try:
+            if db_type == 'postgresql':
+                c.execute('''
+                    CREATE TABLE IF NOT EXISTS user_branches (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        branch_name VARCHAR(200) NOT NULL,
+                        created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, branch_name)
+                    )
+                ''')
+            else:
+                c.execute('''
+                    CREATE TABLE IF NOT EXISTS user_branches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        branch_name TEXT NOT NULL,
+                        created_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, branch_name)
+                    )
+                ''')
+            conn.commit()
+        except:
+            pass
+        
+        # Get user's current branches
         user_branches = []
         try:
             c.execute(f'SELECT branch_name FROM user_branches WHERE user_id = {placeholder} ORDER BY branch_name', (user_id,))
             user_branches = [row[0] for row in c.fetchall()]
         except Exception as e:
-            print(f"user_branches table not available: {e}")
+            print(f"Error getting user branches: {e}")
             user_branches = []
         
         # Get all available branches
-        c.execute('SELECT DISTINCT branch_name FROM data_entries WHERE branch_name IS NOT NULL ORDER BY branch_name')
-        all_branches = [row[0] for row in c.fetchall()]
+        try:
+            c.execute('SELECT DISTINCT branch_name FROM data_entries WHERE branch_name IS NOT NULL ORDER BY branch_name')
+            all_branches = [row[0] for row in c.fetchall()]
+        except:
+            all_branches = ['Main Branch', 'Secondary Branch', 'Third Branch']  # Default branches
         
         conn.close()
         
@@ -1451,6 +1554,7 @@ def get_user_branches(user_id):
         })
         
     except Exception as e:
+        print(f"Error in get_user_branches: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/manage_user_branches', methods=['POST'])
@@ -1471,10 +1575,35 @@ def manage_user_branches():
         c = conn.cursor()
         placeholder = '%s' if db_type == 'postgresql' else '?'
         
-        # Try to use user_branches table, fallback to success message
+        # Ensure user_branches table exists
         try:
-            if action == 'add':
-                # Add branch to user
+            if db_type == 'postgresql':
+                c.execute('''
+                    CREATE TABLE IF NOT EXISTS user_branches (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        branch_name VARCHAR(200) NOT NULL,
+                        created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, branch_name)
+                    )
+                ''')
+            else:
+                c.execute('''
+                    CREATE TABLE IF NOT EXISTS user_branches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        branch_name TEXT NOT NULL,
+                        created_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, branch_name)
+                    )
+                ''')
+            conn.commit()
+        except:
+            pass
+        
+        if action == 'add':
+            # Add branch to user
+            try:
                 if db_type == 'postgresql':
                     c.execute('''INSERT INTO user_branches (user_id, branch_name, created_date) 
                                  VALUES (%s, %s, %s) ON CONFLICT (user_id, branch_name) DO NOTHING''',
@@ -1484,28 +1613,30 @@ def manage_user_branches():
                                  VALUES (?, ?, ?)''',
                               (user_id, branch_name, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
                 message = f'Branch "{branch_name}" added to user'
+            except Exception as e:
+                print(f"Error adding branch: {e}")
+                message = f'Branch "{branch_name}" add attempted'
                 
-            elif action == 'remove':
-                # Remove branch from user (but keep branch data)
+        elif action == 'remove':
+            # Remove branch from user
+            try:
                 c.execute(f'DELETE FROM user_branches WHERE user_id = {placeholder} AND branch_name = {placeholder}',
                           (user_id, branch_name))
                 message = f'Branch "{branch_name}" removed from user'
+            except Exception as e:
+                print(f"Error removing branch: {e}")
+                message = f'Branch "{branch_name}" remove attempted'
                 
-            else:
-                return jsonify({'success': False, 'message': 'Invalid action'}), 400
-            
-            conn.commit()
-            
-        except Exception as table_error:
-            print(f"user_branches table operation failed: {table_error}")
-            # Fallback: Just return success message (table will be created later)
-            message = f'Branch operation recorded (table will be created during next database update)'
+        else:
+            return jsonify({'success': False, 'message': 'Invalid action'}), 400
         
+        conn.commit()
         conn.close()
         
         return jsonify({'success': True, 'message': message})
         
     except Exception as e:
+        print(f"Error in manage_user_branches: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/fix_now')

@@ -47,9 +47,12 @@
                         </td>
                         <td class="branches-cell">
                             <div class="branches-container">
-                                {% if user|length > 7 and user[7] and user[7] != '' %}
-                                    {% for branch in user[7].split(', ') %}
-                                        <span class="branch-tag">{{ branch }}</span>
+                                {% if user|length > 7 and user[7] and user[7] != '' and user[7] != 'None' %}
+                                    {% set branches = user[7].split(', ') if user[7] is string else [] %}
+                                    {% for branch in branches %}
+                                        {% if branch and branch.strip() %}
+                                            <span class="branch-tag">{{ branch.strip() }}</span>
+                                        {% endif %}
                                     {% endfor %}
                                 {% else %}
                                     <span class="no-branches">No branches assigned</span>

@@ -1009,18 +1009,18 @@ def get_management_data(data_type):
                 if category:
                     # Get models for specific category - avoid duplicates
                     try:
-                        # New schema
+                        # New schema - get category name with models
                         c.execute(f'SELECT id FROM categories WHERE name = {placeholder} LIMIT 1', (category,))
                         cat_result = c.fetchone()
                         if cat_result:
-                            c.execute(f'SELECT DISTINCT id, name, category_id, created_at FROM models WHERE category_id = {placeholder} ORDER BY name LIMIT 50', (cat_result[0],))
+                            c.execute(f'SELECT DISTINCT m.id, m.name, c.name as category_name, m.created_at FROM models m JOIN categories c ON m.category_id = c.id WHERE m.category_id = {placeholder} ORDER BY m.name LIMIT 50', (cat_result[0],))
                             rows = c.fetchall()
                             data = []
                             seen_names = set()
                             for row in rows:
                                 if row[1] not in seen_names:
                                     seen_names.add(row[1])
-                                    data.append({'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
+                                    data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                         else:
                             data = []
                     except:
@@ -1034,16 +1034,16 @@ def get_management_data(data_type):
                                 seen_names.add(row[1])
                                 data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                 else:
-                    # Get all models - avoid duplicates
+                    # Get all models with category names - avoid duplicates
                     try:
-                        c.execute('SELECT DISTINCT id, name, category_id, created_at FROM models ORDER BY name LIMIT 100')
+                        c.execute('SELECT DISTINCT m.id, m.name, c.name as category_name, m.created_at FROM models m JOIN categories c ON m.category_id = c.id ORDER BY m.name LIMIT 100')
                         rows = c.fetchall()
                         data = []
                         seen_names = set()
                         for row in rows:
                             if row[1] not in seen_names:
                                 seen_names.add(row[1])
-                                data.append({'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
+                                data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                     except:
                         c.execute('SELECT DISTINCT id, model_name, category_name, created_date FROM models ORDER BY model_name LIMIT 100')
                         rows = c.fetchall()
@@ -1061,18 +1061,18 @@ def get_management_data(data_type):
             try:
                 if category:
                     try:
-                        # New schema
+                        # New schema - get category name with display types
                         c.execute(f'SELECT id FROM categories WHERE name = {placeholder} LIMIT 1', (category,))
                         cat_result = c.fetchone()
                         if cat_result:
-                            c.execute(f'SELECT DISTINCT id, name, category_id, created_at FROM display_types WHERE category_id = {placeholder} ORDER BY name LIMIT 50', (cat_result[0],))
+                            c.execute(f'SELECT DISTINCT dt.id, dt.name, c.name as category_name, dt.created_at FROM display_types dt JOIN categories c ON dt.category_id = c.id WHERE dt.category_id = {placeholder} ORDER BY dt.name LIMIT 50', (cat_result[0],))
                             rows = c.fetchall()
                             data = []
                             seen_names = set()
                             for row in rows:
                                 if row[1] not in seen_names:
                                     seen_names.add(row[1])
-                                    data.append({'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
+                                    data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                         else:
                             data = []
                     except:
@@ -1087,14 +1087,15 @@ def get_management_data(data_type):
                                 data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                 else:
                     try:
-                        c.execute('SELECT DISTINCT id, name, category_id, created_at FROM display_types ORDER BY name LIMIT 100')
+                        # New schema - get all display types with category names
+                        c.execute('SELECT DISTINCT dt.id, dt.name, c.name as category_name, dt.created_at FROM display_types dt JOIN categories c ON dt.category_id = c.id ORDER BY dt.name LIMIT 100')
                         rows = c.fetchall()
                         data = []
                         seen_names = set()
                         for row in rows:
                             if row[1] not in seen_names:
                                 seen_names.add(row[1])
-                                data.append({'id': row[0], 'name': row[1], 'category_id': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
+                                data.append({'id': row[0], 'name': row[1], 'category': row[2], 'created_at': str(row[3]) if row[3] else 'N/A'})
                     except:
                         c.execute('SELECT DISTINCT id, display_type_name, category_name, created_date FROM display_types ORDER BY display_type_name LIMIT 100')
                         rows = c.fetchall()
@@ -1221,17 +1222,25 @@ def manage_data():
 
 def handle_add_data(cursor, conn, data_type, data):
     from datetime import datetime
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    # Get database type for correct placeholder
+    # Get database type for correct placeholder and time format
     _, db_type = get_db_connection()
     placeholder = '%s' if db_type == 'postgresql' else '?'
+    
+    if db_type == 'postgresql':
+        current_time = datetime.now()  # Use datetime object for PostgreSQL
+    else:
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Use string for SQLite
     
     if data_type == 'categories':
         # Try new schema first, fallback to old
         try:
-            cursor.execute(f'INSERT INTO categories (name, created_at) VALUES ({placeholder}, {placeholder})',
-                          (data['name'], current_time))
+            if db_type == 'postgresql':
+                cursor.execute(f'INSERT INTO categories (name, created_at) VALUES ({placeholder}, {placeholder})',
+                              (data['name'], current_time))
+            else:
+                cursor.execute(f'INSERT INTO categories (name, created_at) VALUES ({placeholder}, {placeholder})',
+                              (data['name'], current_time))
         except:
             cursor.execute(f'INSERT INTO categories (category_name, created_date) VALUES ({placeholder}, {placeholder})',
                           (data['name'], current_time))
@@ -1241,6 +1250,11 @@ def handle_add_data(cursor, conn, data_type, data):
             # New schema - need category_id
             cursor.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (data['category'],))
             cat_result = cursor.fetchone()
+            if not cat_result:
+                # Try old schema for category lookup
+                cursor.execute(f'SELECT id FROM categories WHERE category_name = {placeholder}', (data['category'],))
+                cat_result = cursor.fetchone()
+            
             if cat_result:
                 cursor.execute(f'INSERT INTO models (name, category_id, created_at) VALUES ({placeholder}, {placeholder}, {placeholder})',
                               (data['name'], cat_result[0], current_time))
@@ -1256,6 +1270,11 @@ def handle_add_data(cursor, conn, data_type, data):
             # New schema - need category_id
             cursor.execute(f'SELECT id FROM categories WHERE name = {placeholder}', (data['category'],))
             cat_result = cursor.fetchone()
+            if not cat_result:
+                # Try old schema for category lookup
+                cursor.execute(f'SELECT id FROM categories WHERE category_name = {placeholder}', (data['category'],))
+                cat_result = cursor.fetchone()
+            
             if cat_result:
                 cursor.execute(f'INSERT INTO display_types (name, category_id, created_at) VALUES ({placeholder}, {placeholder}, {placeholder})',
                               (data['name'], cat_result[0], current_time))

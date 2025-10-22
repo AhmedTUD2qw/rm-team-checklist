@@ -47,8 +47,8 @@
                         </td>
                         <td class="branches-cell">
                             <div class="branches-container">
-                                {% if user[5] %}
-                                    {% for branch in user[5].split(', ') %}
+                                {% if user|length > 7 and user[7] and user[7] != '' %}
+                                    {% for branch in user[7].split(', ') %}
                                         <span class="branch-tag">{{ branch }}</span>
                                     {% endfor %}
                                 {% else %}

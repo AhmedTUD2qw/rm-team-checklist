@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - RM Team Check list{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>User Management</h2>
+        <div class="admin-actions">
+            <button class="btn btn-primary" onclick="showChangePasswordModal()">Change My Password</button>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </div>
+
+    <!-- Users Management -->
+    <div class="management-section">
+        <div class="section-header">
+            <h3>Manage Users</h3>
+            <button class="btn btn-primary" onclick="showAddUserModal()">Add New User</button>
+        </div>
+
+        <div class="data-table-container">
+            <table class="management-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Company Code</th>
+                        <th>Role</th>
+                        <th>Branches</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user[0] }}</td>
+                        <td>{{ user[1] }}</td>
+                        <td>{{ user[2] }}</td>
+                        <td>
+                            {% if user[4] %}
+                            <span class="role-badge admin">Admin</span>
+                            {% else %}
+                            <span class="role-badge employee">Employee</span>
+                            {% endif %}
+                        </td>
+                        <td class="branches-cell">
+                            <div class="branches-container">
+                                {% if user[5] %}
+                                    {% for branch in user[5].split(', ') %}
+                                        <span class="branch-tag">{{ branch }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="no-branches">No branches assigned</span>
+                                {% endif %}
+                                <button class="btn btn-sm btn-info manage-branches-btn" 
+                                        data-user-id="{{ user[0] }}" 
+                                        data-user-name="{{ user[1] }}"
+                                        onclick="showBranchesModal(this)">
+                                    Manage Branches
+                                </button>
+                            </div>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary" data-user-id="{{ user[0] }}"
+                                data-user-name="{{ user[1] }}" data-user-code="{{ user[2] }}"
+                                data-user-admin="{{ user[4] }}" onclick="editUserFromButton(this)">
+                                Edit
+                            </button>
+                            {% if user[0] != session.user_id %}
+                            <button class="btn btn-sm btn-danger" data-user-id="{{ user[0] }}"
+                                data-user-name="{{ user[1] }}" onclick="deleteUserFromButton(this)">
+                                Delete
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit User Modal -->
+<div class="modal" id="userModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="user-modal-title">Add User</h3>
+            <span class="close-modal" onclick="closeUserModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="userForm">
+                <input type="hidden" id="user-id">
+
+                <div class="form-group">
+                    <label for="user-name">Name:</label>
+                    <input type="text" id="user-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="user-company-code">Company Code:</label>
+                    <input type="text" id="user-company-code" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="user-password">Password:</label>
+                    <input type="password" id="user-password">
+                    <small class="form-text" id="password-help">Leave empty to keep current password (for edit)</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="user-is-admin">
+                        <label for="user-is-admin">Admin User</label>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save User</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal" id="passwordModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Change Password</h3>
+            <span class="close-modal" onclick="closePasswordModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="passwordForm">
+                <div class="form-group">
+                    <label for="current-password">Current Password:</label>
+                    <input type="password" id="current-password" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="new-password">New Password:</label>
+                    <input type="password" id="new-password" required minlength="6">
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm-password">Confirm New Password:</label>
+                    <input type="password" id="confirm-password" required minlength="6">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Change Password</button>
+                    <button type="button" class="btn btn-secondary" onclick="closePasswordModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Branches Management Modal -->
+<div class="modal" id="branchesModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="branches-modal-title">Manage Branches for User</h3>
+            <span class="close-modal" onclick="closeBranchesModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="branches-management">
+                <div class="current-branches">
+                    <h4>Current Branches:</h4>
+                    <div id="current-branches-list" class="branches-list">
+                        <!-- Current branches will be loaded here -->
+                    </div>
+                </div>
+                
+                <div class="available-branches">
+                    <h4>Available Branches:</h4>
+                    <div class="add-branch-section">
+                        <select id="available-branches-select">
+                            <option value="">Select a branch to add</option>
+                        </select>
+                        <button class="btn btn-sm btn-success" onclick="addBranchToUser()">Add Branch</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="closeBranchesModal()">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div class="modal" id="deleteUserModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirm Delete User</h3>
+            <span class="close-modal" onclick="closeDeleteUserModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete user <strong id="delete-user-name"></strong>?</p>
+            <p class="warning-text">This will also delete all their data entries, branches, and uploaded images. This
+                action cannot be undone.</p>
+            <div class="form-actions">
+                <button class="btn btn-danger" onclick="confirmDeleteUser()">Delete User</button>
+                <button class="btn btn-secondary" onclick="closeDeleteUserModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/user_management.js') }}"></script>
+{% endblock %}

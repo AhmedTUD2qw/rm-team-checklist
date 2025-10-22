@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - RM Team Check list{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>RM Team Check list - Admin Dashboard</h2>
+        <div class="admin-actions">
+            <a href="{{ url_for('admin_management') }}" class="btn btn-primary">Data Management</a>
+            <a href="{{ url_for('user_management') }}" class="btn btn-primary">User Management</a>
+            <a href="{{ url_for('export_excel', employee=filters.employee, branch=filters.branch, model=filters.model, date_from=filters.date_from, date_to=filters.date_to) }}" 
+               class="export-excel-btn" title="تصدير محسن مع الصور والتنسيق الاحترافي">
+                🖼️ Export Enhanced Excel (with Images & Formatting)
+            </a>
+            <a href="{{ url_for('export_excel_simple', employee=filters.employee, branch=filters.branch, model=filters.model, date_from=filters.date_from, date_to=filters.date_to) }}" 
+               class="btn btn-secondary" title="تصدير بسيط مع تنسيق أساسي">
+                📋 Export Simple Excel (Text Only)
+            </a>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </div>
+    
+    <!-- Filters Section -->
+    <div class="filters-section">
+        <h3>Filter Data</h3>
+        <form method="GET" action="{{ url_for('admin_dashboard') }}">
+            <div class="filters-row">
+                <div class="form-group">
+                    <label for="employee">Employee Name:</label>
+                    <select id="employee" name="employee">
+                        <option value="">All Employees</option>
+                        {% for employee in employees %}
+                            <option value="{{ employee }}" 
+                                {% if filters.employee == employee %}selected{% endif %}>
+                                {{ employee }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="branch">Branch:</label>
+                    <select id="branch" name="branch">
+                        <option value="">All Branches</option>
+                        {% for branch in branches %}
+                            <option value="{{ branch }}" 
+                                {% if filters.branch == branch %}selected{% endif %}>
+                                {{ branch }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="model">Model:</label>
+                    <select id="model" name="model">
+                        <option value="">All Models</option>
+                        {% for model in models %}
+                            <option value="{{ model }}" 
+                                {% if filters.model == model %}selected{% endif %}>
+                                {{ model }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="date_from">Date From:</label>
+                    <input type="date" id="date_from" name="date_from" 
+                           value="{{ filters.date_from }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="date_to">Date To:</label>
+                    <input type="date" id="date_to" name="date_to" 
+                           value="{{ filters.date_to }}">
+                </div>
+            </div>
+            
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Clear Filters</a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Data Summary -->
+    <div class="summary-section">
+        <h3>Data Summary</h3>
+        <div class="summary-stats">
+            <div class="stat-card">
+                <h4>Total Entries</h4>
+                <span class="stat-number">{{ data_entries|length }}</span>
+            </div>
+            <div class="stat-card">
+                <h4>Unique Employees</h4>
+                <span class="stat-number">{{ employees|length }}</span>
+            </div>
+            <div class="stat-card">
+                <h4>Unique Branches</h4>
+                <span class="stat-number">{{ branches|length }}</span>
+            </div>
+            <div class="stat-card">
+                <h4>Unique Models</h4>
+                <span class="stat-number">{{ models|length }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Data Table -->
+    <div class="data-section">
+        <h3>Employee Data Entries</h3>
+        
+        {% if data_entries %}
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Employee Name</th>
+                            <th>Employee Code</th>
+                            <th>Branch</th>
+                            <th>Shop Code</th>
+                            <th>Model</th>
+                            <th>Display Type</th>
+                            <th>Selected Materials</th>
+                            <th>Missing Materials</th>
+                            <th>Images</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in data_entries %}
+                            <tr>
+                                <td>{{ entry[0] }}</td>
+                                <td>{{ entry[1] }}</td>
+                                <td>{{ entry[2] }}</td>
+                                <td>{{ entry[3] }}</td>
+                                <td>{{ entry[4] if entry[4] else 'N/A' }}</td>
+                                <td>{{ entry[5] }}</td>
+                                <td>{{ entry[6] }}</td>
+                                <td>
+                                    {% if entry[7] %}
+                                        <div class="materials-list">
+                                            {% for material in entry[7].split(',') %}
+                                                <span class="material-tag selected">{{ material }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="no-data">No materials selected</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if entry[8] %}
+                                        <div class="materials-list">
+                                            {% for material in entry[8].split(',') %}
+                                                <span class="material-tag unselected">{{ material }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="no-data">All materials selected</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if entry[9] %}
+                                        <div class="images-list">
+                                            <button class="view-images-btn" 
+                                                    onclick="openImageModal('{{ entry[0] }}', '{{ entry[5] }}', '{{ entry[9] }}')">
+                                                <span class="images-count">📷 {{ entry[9].split(',')|length }} Images</span>
+                                                <span class="view-text">Click to View</span>
+                                            </button>
+                                            {% for image in entry[9].split(',') %}
+                                                <div class="image-item" style="display: none;">
+                                                    {% if image.strip().startswith('http') %}
+                                                        <!-- Cloudinary image -->
+                                                        <img src="{{ image.strip() }}" alt="Image" class="thumbnail" 
+                                                             data-full="{{ image.strip() }}" data-type="cloudinary">
+                                                    {% else %}
+                                                        <!-- Local image -->
+                                                        <img src="{{ url_for('static', filename='uploads/' + image.strip()) }}" 
+                                                             alt="Image" class="thumbnail"
+                                                             data-full="{{ url_for('static', filename='uploads/' + image.strip()) }}"
+                                                             data-download="{{ url_for('download_image', filename=image.strip()) }}"
+                                                             data-type="local">
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="no-data">No images</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ entry[10] }}</td>
+                                <td>
+                                    <button class="delete-entry-btn" onclick="deleteEntry('{{ entry[0] }}')">Delete</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="no-data-message">
+                <p>No data entries found matching the current filters.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div id="imageModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Model Images</h3>
+            <span class="close" onclick="closeImageModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="modalImages" class="modal-images-grid">
+                <!-- Images will be loaded here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button onclick="downloadAllImages()" class="btn btn-primary">📥 Download All</button>
+            <button onclick="closeImageModal()" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Auto-submit form when filters change
+    document.querySelectorAll('select, input[type="date"]').forEach(element => {
+        element.addEventListener('change', function() {
+            // Optional: Auto-submit on change
+            // this.form.submit();
+        });
+    });
+    
+    // Image Modal Functions
+    let currentImages = [];
+    
+    function openImageModal(entryId, modelName, imagesString) {
+        const modal = document.getElementById('imageModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalImages = document.getElementById('modalImages');
+        
+        // Set title
+        modalTitle.textContent = `${modelName} - Images (Entry #${entryId})`;
+        
+        // Clear previous images
+        modalImages.innerHTML = '';
+        currentImages = [];
+        
+        // Parse images string and find corresponding elements
+        const imageUrls = imagesString.split(',');
+        
+        imageUrls.forEach((imageUrl, index) => {
+            const trimmedUrl = imageUrl.trim();
+            if (trimmedUrl) {
+                const imageData = {
+                    src: trimmedUrl.startsWith('http') ? trimmedUrl : `/static/uploads/${trimmedUrl}`,
+                    full: trimmedUrl.startsWith('http') ? trimmedUrl : `/static/uploads/${trimmedUrl}`,
+                    download: trimmedUrl.startsWith('http') ? trimmedUrl : `/download_image/${trimmedUrl}`,
+                    type: trimmedUrl.startsWith('http') ? 'cloudinary' : 'local',
+                    index: index + 1
+                };
+                currentImages.push(imageData);
+                
+                // Create modal image item
+                const modalImageItem = document.createElement('div');
+                modalImageItem.className = 'modal-image-item';
+                modalImageItem.innerHTML = `
+                    <div class="modal-image-container">
+                        <img src="${imageData.src}" alt="Image ${index + 1}" class="modal-image">
+                        <div class="modal-image-overlay">
+                            <button onclick="viewFullImage('${imageData.full}')" 
+                                    class="modal-btn view-btn" title="View Full Size">
+                                🔍
+                            </button>
+                            <button onclick="downloadSingleImage('${imageData.full}', '${imageData.download}', '${imageData.type}', ${index + 1})" 
+                                    class="modal-btn download-btn" title="Download">
+                                📥
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-image-info">
+                        <span class="image-number">Image ${index + 1}</span>
+                        <span class="image-type">${imageData.type === 'cloudinary' ? 'Cloud' : 'Local'}</span>
+                    </div>
+                `;
+                modalImages.appendChild(modalImageItem);
+            }
+        });
+        
+        // Show modal
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closeImageModal() {
+        const modal = document.getElementById('imageModal');
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+        currentImages = [];
+    }
+    
+    function viewFullImage(imageUrl) {
+        window.open(imageUrl, '_blank');
+    }
+    
+    function downloadSingleImage(fullUrl, downloadUrl, type, imageNumber) {
+        // Show loading indicator
+        const downloadBtn = event.target;
+        const originalText = downloadBtn.innerHTML;
+        downloadBtn.innerHTML = '⏳';
+        downloadBtn.disabled = true;
+        
+        if (type === 'local') {
+            // For local images, use the download endpoint
+            downloadFile(downloadUrl, `image_${imageNumber}.jpg`);
+        } else {
+            // For cloudinary images, download directly
+            downloadFile(fullUrl, `cloudinary_image_${imageNumber}.jpg`);
+        }
+        
+        // Reset button after delay
+        setTimeout(() => {
+            downloadBtn.innerHTML = originalText;
+            downloadBtn.disabled = false;
+        }, 2000);
+    }
+    
+    function downloadAllImages() {
+        if (currentImages.length === 0) {
+            alert('No images to download');
+            return;
+        }
+        
+        // Show progress
+        const downloadAllBtn = document.querySelector('.btn-primary');
+        const originalText = downloadAllBtn.textContent;
+        let downloadCount = 0;
+        
+        downloadAllBtn.textContent = `Downloading... (0/${currentImages.length})`;
+        downloadAllBtn.disabled = true;
+        
+        currentImages.forEach((image, index) => {
+            setTimeout(() => {
+                const filename = `image_${index + 1}_${Date.now()}.jpg`;
+                
+                if (image.type === 'local') {
+                    downloadFile(image.download, filename);
+                } else {
+                    downloadFile(image.full, filename);
+                }
+                
+                downloadCount++;
+                downloadAllBtn.textContent = `Downloading... (${downloadCount}/${currentImages.length})`;
+                
+                // Reset button when all downloads complete
+                if (downloadCount === currentImages.length) {
+                    setTimeout(() => {
+                        downloadAllBtn.textContent = originalText;
+                        downloadAllBtn.disabled = false;
+                        showDownloadMessage(`Successfully initiated download of ${currentImages.length} images!`);
+                    }, 1000);
+                }
+            }, index * 800); // Delay between downloads
+        });
+    }
+    
+    // Helper function to download files
+    function downloadFile(url, filename) {
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Check if blob is valid
+                if (blob.size === 0) {
+                    throw new Error('Downloaded file is empty');
+                }
+                
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(downloadUrl);
+                    document.body.removeChild(a);
+                }, 100);
+                
+                // Show success for individual downloads
+                if (!filename.includes('image_1_')) { // Don't show for batch downloads
+                    showDownloadMessage(`Downloaded: ${filename}`);
+                }
+            })
+            .catch(error => {
+                console.error('Download failed:', error);
+                showDownloadError(`Download failed: ${error.message}`);
+                
+                // Fallback to opening in new tab
+                setTimeout(() => {
+                    window.open(url, '_blank');
+                }, 1000);
+            });
+    }
+    
+    // Show download success message
+    function showDownloadMessage(message) {
+        // Create message element
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'download-success-message';
+        messageDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">✅</span>
+                <span>${message}</span>
+            </div>
+        `;
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+            z-index: 10000;
+            font-weight: 500;
+            animation: slideInRight 0.4s ease-out;
+            border: 2px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+        `;
+        
+        document.body.appendChild(messageDiv);
+        
+        // Play success sound (if available)
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+            audio.volume = 0.3;
+            audio.play().catch(() => {}); // Ignore if audio fails
+        } catch (e) {}
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            messageDiv.style.animation = 'slideOutRight 0.4s ease-in';
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 400);
+        }, 5000);
+    }
+    
+    // Show download error message
+    function showDownloadError(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'download-error-message';
+        messageDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">❌</span>
+                <span>${message}</span>
+            </div>
+        `;
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
+            z-index: 10000;
+            font-weight: 500;
+            animation: slideInRight 0.4s ease-out;
+            border: 2px solid rgba(255,255,255,0.2);
+        `;
+        
+        document.body.appendChild(messageDiv);
+        
+        setTimeout(() => {
+            messageDiv.style.animation = 'slideOutRight 0.4s ease-in';
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 400);
+        }, 4000);
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('imageModal');
+        if (event.target === modal) {
+            closeImageModal();
+        }
+    }
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeImageModal();
+        }
+    });
+    
+    function deleteEntry(entryId) {
+        if (confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
+            fetch(`/delete_entry/${entryId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Entry deleted successfully');
+                    location.reload(); // Refresh the page
+                } else {
+                    alert('Error deleting entry: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error deleting entry');
+            });
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Data Entry - RM Team Check list{% endblock %}
+
+{% block content %}
+<div class="data-entry-container">
+    <div class="header">
+        <h2>RM Team Check list - Data Entry</h2>
+        <div class="user-info">
+            <span>Welcome, {{ session.user_name }}</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+        </div>
+    </div>
+    
+    <div class="current-date">
+        <strong>Current Date: <span id="currentDate"></span></strong>
+    </div>
+    
+    <form id="dataEntryForm" method="POST" action="/submit_data" enctype="multipart/form-data">
+        <div id="modelsContainer">
+            <div class="model-entry" data-index="0">
+                <h3>Model Entry 1</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="branch_0">Branch Name:</label>
+                        <div class="autocomplete-container">
+                            <input type="text" id="branch_0" name="branch_0" class="branch-input" 
+                                   placeholder="Type branch name or shop code..." required autocomplete="off">
+                            <div class="autocomplete-suggestions" id="suggestions_0"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="shop_code_0">Shop Code:</label>
+                        <input type="text" id="shop_code_0" name="shop_code_0" class="shop-code-input" 
+                               placeholder="Enter shop code..." required autocomplete="off">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="category_0">Category:</label>
+                    <select id="category_0" name="category_0" class="category-select" required>
+                        <option value="">Select Category</option>
+                        <!-- Categories will be loaded dynamically -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="model_0">Model:</label>
+                    <select id="model_0" name="model_0" class="model-select" required disabled>
+                        <option value="">Select Model</option>
+                    </select>
+                </div>
+                
+                <div class="display-type-section" style="display: none;">
+                    <h4>Display Type</h4>
+                    <div class="form-group">
+                        <select name="display_type_0" class="display-type-select" required>
+                            <option value="">Select Display Type</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="pop-material-section" style="display: none;">
+                    <h4>POP Material</h4>
+                    <div class="checklist-container">
+                        <!-- Checklist items will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="image-upload-section" style="display: none;">
+                    <h4>📸 Image Upload</h4>
+                    <div class="form-group">
+                        <label for="images_0" class="file-upload-label">
+                            <span class="upload-icon">📁</span>
+                            <span class="upload-text">Choose Multiple Images</span>
+                            <span class="upload-hint">(JPG, PNG, WEBP - Max 10 images)</span>
+                        </label>
+                        <input type="file" id="images_0" name="images_0" multiple accept="image/*,.webp,.avif" 
+                               class="image-upload" style="display: none;" max="10">
+                        <div class="upload-info">
+                            <small>💡 You can select multiple images at once (Ctrl+Click or Shift+Click)</small>
+                        </div>
+                        <div class="image-preview"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="button" id="addModelBtn" class="btn btn-secondary">Add Another Model</button>
+            <button type="submit" class="btn btn-primary">Save Data</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/data_entry.js') }}"></script>
+{% endblock %}
